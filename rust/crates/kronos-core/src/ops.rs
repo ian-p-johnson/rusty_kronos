@@ -25,10 +25,9 @@ pub fn rms_norm(x: &Tensor, weight: &Tensor, eps: f32) -> Result<Tensor> {
     // may differ by 1 ulp from 1/sqrt, which is far below our parity budget.
     let rsqrt = ms.sqrt()?.recip()?;
     let normed = rsqrt.affine(1.0f64, eps as f64)?;
-    Ok(x32
-        .broadcast_mul(&normed)?
+    x32.broadcast_mul(&normed)?
         .to_dtype(x.dtype())?
-        .broadcast_mul(weight)?)
+        .broadcast_mul(weight)
 }
 
 /// RoPE — `model/module.py:284-312`.
@@ -54,7 +53,10 @@ pub struct RotaryCache {
 
 impl RotaryCache {
     pub fn new(dim: usize, max_len: usize, device: &Device, dtype: DType) -> Result<Self> {
-        assert!(dim % 2 == 0, "RoPE head_dim must be even, got {dim}");
+        assert!(
+            dim.is_multiple_of(2),
+            "RoPE head_dim must be even, got {dim}"
+        );
         // upstream: 1.0 / (10000 ** (arange(0, dim, 2) / dim))
         // expressed as exp(-(j/dim)*ln10000) because powf(-1) on the j=0 term
         // would be 0**-1 = +inf and poison the whole table with NaN.
@@ -103,8 +105,8 @@ fn rotate_half_apply(x: &Tensor, cos: &Tensor, sin: &Tensor) -> Result<Tensor> {
     let x1 = x.narrow(3, 0, half)?;
     let x2 = x.narrow(3, half, half)?;
     let rotated = Tensor::cat(&[&x2.neg()?, &x1], 3)?;
-    Ok(x.broadcast_mul(cos)?
-        .broadcast_add(&rotated.broadcast_mul(sin)?)?)
+    x.broadcast_mul(cos)?
+        .broadcast_add(&rotated.broadcast_mul(sin)?)
 }
 
 /// `F.scaled_dot_product_attention` — `model/module.py:345` (self) / `:389` (cross).
@@ -199,7 +201,7 @@ pub fn indices_to_bits(
     let b1 = expand(s1)?;
     let b2 = expand(s2)?;
     let out = Tensor::cat(&[&b1, &b2], b1.dims().len() - 1)?;
-    Ok(out.affine(q_scale, 0.0)?)
+    out.affine(q_scale, 0.0)
 }
 
 /// Rebuild `group_codebook` — `model/module.py:76-78`.
