@@ -20,6 +20,1642 @@
         "bytes": 409264008,
         "filename": "model.safetensors",
         "sha256": "abff193acab6db1a0368e9773e75799d11403b6d054ee6d5f0a11aeabc5f4b83"
+      },
+      "tensors": {
+        "dep_layer.cross_attn.k_proj.bias": {
+          "absmax": 0.6158237457275391,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.3117554483199001
+        },
+        "dep_layer.cross_attn.k_proj.weight": {
+          "absmax": 0.814697265625,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 21.23953064574082
+        },
+        "dep_layer.cross_attn.out_proj.bias": {
+          "absmax": 2.4264748096466064,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.5942326627118746
+        },
+        "dep_layer.cross_attn.out_proj.weight": {
+          "absmax": 2.3067924976348877,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 20.870070589315688
+        },
+        "dep_layer.cross_attn.q_proj.bias": {
+          "absmax": 1.1012325286865234,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 7.935869382054079
+        },
+        "dep_layer.cross_attn.q_proj.weight": {
+          "absmax": 0.21071690320968628,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -12.672234855111213
+        },
+        "dep_layer.cross_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 104,
+          "shape": [
+            104
+          ],
+          "sum": 11.797855626777164
+        },
+        "dep_layer.cross_attn.v_proj.bias": {
+          "absmax": 0.8106974959373474,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.09371542828557722
+        },
+        "dep_layer.cross_attn.v_proj.weight": {
+          "absmax": 0.8245636820793152,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 38.074120440298906
+        },
+        "dep_layer.norm.weight": {
+          "absmax": 0.9352912306785583,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 377.6687861382961
+        },
+        "embedding.emb_s1.weight": {
+          "absmax": 0.6351518630981445,
+          "n": 851968,
+          "shape": [
+            1024,
+            832
+          ],
+          "sum": -232.0038116862532
+        },
+        "embedding.emb_s2.weight": {
+          "absmax": 0.5418994426727295,
+          "n": 851968,
+          "shape": [
+            1024,
+            832
+          ],
+          "sum": -113.18519369060344
+        },
+        "embedding.fusion_proj.bias": {
+          "absmax": 2.794058322906494,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.24014702765271068
+        },
+        "embedding.fusion_proj.weight": {
+          "absmax": 2.8468449115753174,
+          "n": 1384448,
+          "shape": [
+            832,
+            1664
+          ],
+          "sum": 45.935551301201436
+        },
+        "head.proj_s1.bias": {
+          "absmax": 4.973034381866455,
+          "n": 1024,
+          "shape": [
+            1024
+          ],
+          "sum": -3839.5748132169247
+        },
+        "head.proj_s1.weight": {
+          "absmax": 3.7025978565216064,
+          "n": 851968,
+          "shape": [
+            1024,
+            832
+          ],
+          "sum": -1311.3086842287314
+        },
+        "head.proj_s2.bias": {
+          "absmax": 2.9490737915039062,
+          "n": 1024,
+          "shape": [
+            1024
+          ],
+          "sum": -2551.8737043105066
+        },
+        "head.proj_s2.weight": {
+          "absmax": 3.4531915187835693,
+          "n": 851968,
+          "shape": [
+            1024,
+            832
+          ],
+          "sum": -4325.033467487934
+        },
+        "norm.weight": {
+          "absmax": 1.2099336385726929,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 402.17859408818185
+        },
+        "time_emb.day_embed.weight": {
+          "absmax": 3.1628198623657227,
+          "n": 26624,
+          "shape": [
+            32,
+            832
+          ],
+          "sum": 5.190565531935192
+        },
+        "time_emb.hour_embed.weight": {
+          "absmax": 3.164424419403076,
+          "n": 19968,
+          "shape": [
+            24,
+            832
+          ],
+          "sum": -12.018199015868774
+        },
+        "time_emb.minute_embed.weight": {
+          "absmax": 2.607126474380493,
+          "n": 49920,
+          "shape": [
+            60,
+            832
+          ],
+          "sum": -32.4650441599656
+        },
+        "time_emb.month_embed.weight": {
+          "absmax": 2.8857853412628174,
+          "n": 10816,
+          "shape": [
+            13,
+            832
+          ],
+          "sum": -8.679509884525032
+        },
+        "time_emb.weekday_embed.weight": {
+          "absmax": 2.658169746398926,
+          "n": 5824,
+          "shape": [
+            7,
+            832
+          ],
+          "sum": 13.543012359339627
+        },
+        "transformer.0.ffn.w1.weight": {
+          "absmax": 0.805901825428009,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 1108.1706924987002
+        },
+        "transformer.0.ffn.w2.weight": {
+          "absmax": 0.7088389992713928,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -94.45593957688551
+        },
+        "transformer.0.ffn.w3.weight": {
+          "absmax": 0.9086464643478394,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": -45.969729481075454
+        },
+        "transformer.0.norm1.weight": {
+          "absmax": 0.641279935836792,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 205.21938595781103
+        },
+        "transformer.0.norm2.weight": {
+          "absmax": 1.1827647686004639,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 326.8280022377148
+        },
+        "transformer.0.self_attn.k_proj.bias": {
+          "absmax": 1.060733437538147,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 5.150586361385649
+        },
+        "transformer.0.self_attn.k_proj.weight": {
+          "absmax": 0.6496708989143372,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 16.544662533573856
+        },
+        "transformer.0.self_attn.out_proj.bias": {
+          "absmax": 1.3769606351852417,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 2.9314104208624485
+        },
+        "transformer.0.self_attn.out_proj.weight": {
+          "absmax": 0.8310765624046326,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -25.912804916919868
+        },
+        "transformer.0.self_attn.q_proj.bias": {
+          "absmax": 0.9265181422233582,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.229337736411253
+        },
+        "transformer.0.self_attn.q_proj.weight": {
+          "absmax": 0.6184315085411072,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 25.17078225701482
+        },
+        "transformer.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.0.self_attn.v_proj.bias": {
+          "absmax": 0.20761482417583466,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.07455014951483463
+        },
+        "transformer.0.self_attn.v_proj.weight": {
+          "absmax": 0.6233349442481995,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -80.52363507585855
+        },
+        "transformer.1.ffn.w1.weight": {
+          "absmax": 0.9990596175193787,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 1494.1882531932247
+        },
+        "transformer.1.ffn.w2.weight": {
+          "absmax": 1.9001986980438232,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": 85.19351050778478
+        },
+        "transformer.1.ffn.w3.weight": {
+          "absmax": 1.0608159303665161,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 4.422503442448317
+        },
+        "transformer.1.norm1.weight": {
+          "absmax": 0.4124316871166229,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 184.961045589298
+        },
+        "transformer.1.norm2.weight": {
+          "absmax": 0.6179657578468323,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 316.99092898890376
+        },
+        "transformer.1.self_attn.k_proj.bias": {
+          "absmax": 2.4111316204071045,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 9.182708490334335
+        },
+        "transformer.1.self_attn.k_proj.weight": {
+          "absmax": 1.716781497001648,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 54.27151236437219
+        },
+        "transformer.1.self_attn.out_proj.bias": {
+          "absmax": 1.3850091695785522,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.2933198284572427
+        },
+        "transformer.1.self_attn.out_proj.weight": {
+          "absmax": 0.6219345927238464,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -65.79787652036174
+        },
+        "transformer.1.self_attn.q_proj.bias": {
+          "absmax": 1.9609073400497437,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 1.42107228362147
+        },
+        "transformer.1.self_attn.q_proj.weight": {
+          "absmax": 1.7612149715423584,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 95.67326618191227
+        },
+        "transformer.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.1.self_attn.v_proj.bias": {
+          "absmax": 0.20363909006118774,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 1.0126718361880194
+        },
+        "transformer.1.self_attn.v_proj.weight": {
+          "absmax": 1.1113195419311523,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -23.707744510691136
+        },
+        "transformer.10.ffn.w1.weight": {
+          "absmax": 1.0722452402114868,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 330.7670280533255
+        },
+        "transformer.10.ffn.w2.weight": {
+          "absmax": 4.517312526702881,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": 45.54457336630145
+        },
+        "transformer.10.ffn.w3.weight": {
+          "absmax": 1.047311544418335,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 101.99010653856178
+        },
+        "transformer.10.norm1.weight": {
+          "absmax": 0.5191624760627747,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 315.23486341908574
+        },
+        "transformer.10.norm2.weight": {
+          "absmax": 0.8716338276863098,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 570.4846766740084
+        },
+        "transformer.10.self_attn.k_proj.bias": {
+          "absmax": 0.8652880787849426,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 3.1269523680962266
+        },
+        "transformer.10.self_attn.k_proj.weight": {
+          "absmax": 0.8157193064689636,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -78.36324943323308
+        },
+        "transformer.10.self_attn.out_proj.bias": {
+          "absmax": 0.652865469455719,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 1.6486564281221945
+        },
+        "transformer.10.self_attn.out_proj.weight": {
+          "absmax": 1.4993562698364258,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -25.615129427584947
+        },
+        "transformer.10.self_attn.q_proj.bias": {
+          "absmax": 0.40551015734672546,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 5.792516438319581
+        },
+        "transformer.10.self_attn.q_proj.weight": {
+          "absmax": 0.5394863486289978,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -86.6114043415283
+        },
+        "transformer.10.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.10.self_attn.v_proj.bias": {
+          "absmax": 0.3625534474849701,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -2.4561086473840987
+        },
+        "transformer.10.self_attn.v_proj.weight": {
+          "absmax": 0.8253097534179688,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 152.39251493905184
+        },
+        "transformer.11.ffn.w1.weight": {
+          "absmax": 1.4421374797821045,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 782.4352394820498
+        },
+        "transformer.11.ffn.w2.weight": {
+          "absmax": 4.446791172027588,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -213.6774768768821
+        },
+        "transformer.11.ffn.w3.weight": {
+          "absmax": 1.2064446210861206,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 105.4279190722928
+        },
+        "transformer.11.norm1.weight": {
+          "absmax": 0.6064981818199158,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 357.55193074792624
+        },
+        "transformer.11.norm2.weight": {
+          "absmax": 0.840289831161499,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 546.7341264486313
+        },
+        "transformer.11.self_attn.k_proj.bias": {
+          "absmax": 1.2263485193252563,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 1.407446277580675
+        },
+        "transformer.11.self_attn.k_proj.weight": {
+          "absmax": 0.8267373442649841,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 92.72918020913816
+        },
+        "transformer.11.self_attn.out_proj.bias": {
+          "absmax": 0.6334860324859619,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.7017658732365817
+        },
+        "transformer.11.self_attn.out_proj.weight": {
+          "absmax": 1.5048012733459473,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 7.5950651848981
+        },
+        "transformer.11.self_attn.q_proj.bias": {
+          "absmax": 0.5405920743942261,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 3.2974118754355004
+        },
+        "transformer.11.self_attn.q_proj.weight": {
+          "absmax": 0.6634034514427185,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 112.31458199085503
+        },
+        "transformer.11.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.11.self_attn.v_proj.bias": {
+          "absmax": 0.23510771989822388,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.49318354800379893
+        },
+        "transformer.11.self_attn.v_proj.weight": {
+          "absmax": 0.7454371452331543,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -53.35876018048947
+        },
+        "transformer.2.ffn.w1.weight": {
+          "absmax": 0.9533506631851196,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 1698.8552003194136
+        },
+        "transformer.2.ffn.w2.weight": {
+          "absmax": 1.6292386054992676,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": 29.61595091228196
+        },
+        "transformer.2.ffn.w3.weight": {
+          "absmax": 1.2113981246948242,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 10.719291659521062
+        },
+        "transformer.2.norm1.weight": {
+          "absmax": 0.3851630985736847,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 201.05331141874194
+        },
+        "transformer.2.norm2.weight": {
+          "absmax": 0.5169177055358887,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 314.01835300400853
+        },
+        "transformer.2.self_attn.k_proj.bias": {
+          "absmax": 2.2073774337768555,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 16.79457147209905
+        },
+        "transformer.2.self_attn.k_proj.weight": {
+          "absmax": 1.3282753229141235,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 4.676646280922601
+        },
+        "transformer.2.self_attn.out_proj.bias": {
+          "absmax": 1.2283235788345337,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 2.008695235923369
+        },
+        "transformer.2.self_attn.out_proj.weight": {
+          "absmax": 0.8668147325515747,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -29.94412388202391
+        },
+        "transformer.2.self_attn.q_proj.bias": {
+          "absmax": 1.3060107231140137,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 8.565109166898765
+        },
+        "transformer.2.self_attn.q_proj.weight": {
+          "absmax": 1.283244252204895,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -203.6514226115135
+        },
+        "transformer.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.2.self_attn.v_proj.bias": {
+          "absmax": 0.20714357495307922,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.9419370359610184
+        },
+        "transformer.2.self_attn.v_proj.weight": {
+          "absmax": 0.8996880650520325,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -106.91315364889425
+        },
+        "transformer.3.ffn.w1.weight": {
+          "absmax": 1.2366323471069336,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 2111.8334978594103
+        },
+        "transformer.3.ffn.w2.weight": {
+          "absmax": 2.069035291671753,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": 124.43696777673674
+        },
+        "transformer.3.ffn.w3.weight": {
+          "absmax": 0.8441327810287476,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": -173.12082805808373
+        },
+        "transformer.3.norm1.weight": {
+          "absmax": 0.3624727725982666,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 208.35993042960763
+        },
+        "transformer.3.norm2.weight": {
+          "absmax": 0.5150632858276367,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 321.5781035348773
+        },
+        "transformer.3.self_attn.k_proj.bias": {
+          "absmax": 3.597062349319458,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.30405414961933275
+        },
+        "transformer.3.self_attn.k_proj.weight": {
+          "absmax": 2.162785291671753,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 100.29590126290228
+        },
+        "transformer.3.self_attn.out_proj.bias": {
+          "absmax": 0.9693139791488647,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.5358073648276331
+        },
+        "transformer.3.self_attn.out_proj.weight": {
+          "absmax": 0.7859057784080505,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -67.88729154859432
+        },
+        "transformer.3.self_attn.q_proj.bias": {
+          "absmax": 1.0967460870742798,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -3.398429492915966
+        },
+        "transformer.3.self_attn.q_proj.weight": {
+          "absmax": 1.0226366519927979,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 82.56501443932356
+        },
+        "transformer.3.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.3.self_attn.v_proj.bias": {
+          "absmax": 0.256312757730484,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.2771109432724188
+        },
+        "transformer.3.self_attn.v_proj.weight": {
+          "absmax": 0.7868812084197998,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 4.879479497182558
+        },
+        "transformer.4.ffn.w1.weight": {
+          "absmax": 0.9768575429916382,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 1823.0409211590293
+        },
+        "transformer.4.ffn.w2.weight": {
+          "absmax": 2.1294167041778564,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -79.40311128953691
+        },
+        "transformer.4.ffn.w3.weight": {
+          "absmax": 0.8628396987915039,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": -14.34464964731432
+        },
+        "transformer.4.norm1.weight": {
+          "absmax": 0.37570881843566895,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 222.24543995782733
+        },
+        "transformer.4.norm2.weight": {
+          "absmax": 0.5239953994750977,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 339.07826824858785
+        },
+        "transformer.4.self_attn.k_proj.bias": {
+          "absmax": 3.327894687652588,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -11.551819490581693
+        },
+        "transformer.4.self_attn.k_proj.weight": {
+          "absmax": 1.9427895545959473,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 58.67813584276113
+        },
+        "transformer.4.self_attn.out_proj.bias": {
+          "absmax": 0.8397448062896729,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 2.140133211095417
+        },
+        "transformer.4.self_attn.out_proj.weight": {
+          "absmax": 0.8930572867393494,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -35.050226981607054
+        },
+        "transformer.4.self_attn.q_proj.bias": {
+          "absmax": 1.2271052598953247,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -10.512787261293852
+        },
+        "transformer.4.self_attn.q_proj.weight": {
+          "absmax": 1.2739824056625366,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -38.0002889980902
+        },
+        "transformer.4.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.4.self_attn.v_proj.bias": {
+          "absmax": 0.19076400995254517,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.6790894488367485
+        },
+        "transformer.4.self_attn.v_proj.weight": {
+          "absmax": 0.9057345390319824,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -11.493950840306894
+        },
+        "transformer.5.ffn.w1.weight": {
+          "absmax": 1.2058510780334473,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 1836.2782071191089
+        },
+        "transformer.5.ffn.w2.weight": {
+          "absmax": 1.8400585651397705,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -9.508690753391221
+        },
+        "transformer.5.ffn.w3.weight": {
+          "absmax": 0.9241311550140381,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 323.24000655290604
+        },
+        "transformer.5.norm1.weight": {
+          "absmax": 0.38680464029312134,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 223.31700493767858
+        },
+        "transformer.5.norm2.weight": {
+          "absmax": 0.5825811624526978,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 361.6299232952297
+        },
+        "transformer.5.self_attn.k_proj.bias": {
+          "absmax": 3.0073788166046143,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -4.040770588435407
+        },
+        "transformer.5.self_attn.k_proj.weight": {
+          "absmax": 1.7950665950775146,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 57.645928087708285
+        },
+        "transformer.5.self_attn.out_proj.bias": {
+          "absmax": 0.7481139898300171,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 1.4711733799776994
+        },
+        "transformer.5.self_attn.out_proj.weight": {
+          "absmax": 0.6707062721252441,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 5.02062549692026
+        },
+        "transformer.5.self_attn.q_proj.bias": {
+          "absmax": 1.2602038383483887,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -2.009306938090049
+        },
+        "transformer.5.self_attn.q_proj.weight": {
+          "absmax": 1.1961551904678345,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -38.86758499202456
+        },
+        "transformer.5.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.5.self_attn.v_proj.bias": {
+          "absmax": 0.2747843563556671,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.9963445786111151
+        },
+        "transformer.5.self_attn.v_proj.weight": {
+          "absmax": 1.0172885656356812,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -37.402549492931655
+        },
+        "transformer.6.ffn.w1.weight": {
+          "absmax": 1.000978946685791,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 1210.4398049971767
+        },
+        "transformer.6.ffn.w2.weight": {
+          "absmax": 1.7518881559371948,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -177.83129933370554
+        },
+        "transformer.6.ffn.w3.weight": {
+          "absmax": 1.073632001876831,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 8.0310187112999
+        },
+        "transformer.6.norm1.weight": {
+          "absmax": 0.38831448554992676,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 242.05573572218418
+        },
+        "transformer.6.norm2.weight": {
+          "absmax": 0.6260583996772766,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 391.5442720875144
+        },
+        "transformer.6.self_attn.k_proj.bias": {
+          "absmax": 1.37826406955719,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -11.531701599822554
+        },
+        "transformer.6.self_attn.k_proj.weight": {
+          "absmax": 1.0658048391342163,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 235.61913719512427
+        },
+        "transformer.6.self_attn.out_proj.bias": {
+          "absmax": 0.6660601496696472,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 2.1933823655126616
+        },
+        "transformer.6.self_attn.out_proj.weight": {
+          "absmax": 0.7650632858276367,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 89.6740208476098
+        },
+        "transformer.6.self_attn.q_proj.bias": {
+          "absmax": 0.6518515944480896,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -4.1333356762479525
+        },
+        "transformer.6.self_attn.q_proj.weight": {
+          "absmax": 0.8913204669952393,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 38.19039435057715
+        },
+        "transformer.6.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.6.self_attn.v_proj.bias": {
+          "absmax": 0.30029404163360596,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.4247319607602549
+        },
+        "transformer.6.self_attn.v_proj.weight": {
+          "absmax": 0.9623351097106934,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -45.82712522930544
+        },
+        "transformer.7.ffn.w1.weight": {
+          "absmax": 0.8876937031745911,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 976.6524827634128
+        },
+        "transformer.7.ffn.w2.weight": {
+          "absmax": 3.2665092945098877,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -217.73926148899437
+        },
+        "transformer.7.ffn.w3.weight": {
+          "absmax": 0.896027147769928,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": -46.643607590334064
+        },
+        "transformer.7.norm1.weight": {
+          "absmax": 0.4123802185058594,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 254.0091796182096
+        },
+        "transformer.7.norm2.weight": {
+          "absmax": 0.6688419580459595,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 431.93106427043676
+        },
+        "transformer.7.self_attn.k_proj.bias": {
+          "absmax": 1.7714967727661133,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -9.218700996720145
+        },
+        "transformer.7.self_attn.k_proj.weight": {
+          "absmax": 1.0133291482925415,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -168.19968735672236
+        },
+        "transformer.7.self_attn.out_proj.bias": {
+          "absmax": 0.6494600772857666,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 1.8174033322720788
+        },
+        "transformer.7.self_attn.out_proj.weight": {
+          "absmax": 0.8255691528320312,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -1.4746197028260397
+        },
+        "transformer.7.self_attn.q_proj.bias": {
+          "absmax": 0.6039165258407593,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.979184994190291
+        },
+        "transformer.7.self_attn.q_proj.weight": {
+          "absmax": 0.794171154499054,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -77.4684232241394
+        },
+        "transformer.7.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.7.self_attn.v_proj.bias": {
+          "absmax": 0.2605644464492798,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.45400029706434
+        },
+        "transformer.7.self_attn.v_proj.weight": {
+          "absmax": 1.0567935705184937,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 77.81562726502014
+        },
+        "transformer.8.ffn.w1.weight": {
+          "absmax": 0.6226413249969482,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 739.545917090381
+        },
+        "transformer.8.ffn.w2.weight": {
+          "absmax": 3.07098388671875,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -41.23208566930313
+        },
+        "transformer.8.ffn.w3.weight": {
+          "absmax": 0.670513927936554,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": -120.24649277051991
+        },
+        "transformer.8.norm1.weight": {
+          "absmax": 0.46613219380378723,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 277.33681709319353
+        },
+        "transformer.8.norm2.weight": {
+          "absmax": 0.753289520740509,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 468.5747593790293
+        },
+        "transformer.8.self_attn.k_proj.bias": {
+          "absmax": 1.7599636316299438,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 4.5829192798476015
+        },
+        "transformer.8.self_attn.k_proj.weight": {
+          "absmax": 1.1698532104492188,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -109.25261800780143
+        },
+        "transformer.8.self_attn.out_proj.bias": {
+          "absmax": 0.6192575693130493,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -0.050765611849783454
+        },
+        "transformer.8.self_attn.out_proj.weight": {
+          "absmax": 1.1760709285736084,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -101.4374127332194
+        },
+        "transformer.8.self_attn.q_proj.bias": {
+          "absmax": 0.6361010074615479,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -2.3697514885825512
+        },
+        "transformer.8.self_attn.q_proj.weight": {
+          "absmax": 0.7692536115646362,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -134.08679444679598
+        },
+        "transformer.8.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.8.self_attn.v_proj.bias": {
+          "absmax": 0.24146845936775208,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 2.4116532749976614
+        },
+        "transformer.8.self_attn.v_proj.weight": {
+          "absmax": 0.9149700999259949,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 60.205304982413466
+        },
+        "transformer.9.ffn.w1.weight": {
+          "absmax": 0.7440448999404907,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": 649.7572220018855
+        },
+        "transformer.9.ffn.w2.weight": {
+          "absmax": 6.164741516113281,
+          "n": 1703936,
+          "shape": [
+            832,
+            2048
+          ],
+          "sum": -10.860930691823967
+        },
+        "transformer.9.ffn.w3.weight": {
+          "absmax": 0.7342099547386169,
+          "n": 1703936,
+          "shape": [
+            2048,
+            832
+          ],
+          "sum": -92.41753128986598
+        },
+        "transformer.9.norm1.weight": {
+          "absmax": 0.47416725754737854,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 287.1865935884416
+        },
+        "transformer.9.norm2.weight": {
+          "absmax": 0.8126854300498962,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 518.5384939685464
+        },
+        "transformer.9.self_attn.k_proj.bias": {
+          "absmax": 1.4122302532196045,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -4.134465434855883
+        },
+        "transformer.9.self_attn.k_proj.weight": {
+          "absmax": 1.014025092124939,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 42.65988724093364
+        },
+        "transformer.9.self_attn.out_proj.bias": {
+          "absmax": 0.7309320569038391,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": 0.6716505384683842
+        },
+        "transformer.9.self_attn.out_proj.weight": {
+          "absmax": 1.5400255918502808,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": 1.087670741839517
+        },
+        "transformer.9.self_attn.q_proj.bias": {
+          "absmax": 0.47599953413009644,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -1.333027522196062
+        },
+        "transformer.9.self_attn.q_proj.weight": {
+          "absmax": 0.6570491194725037,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -20.655445920416597
+        },
+        "transformer.9.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 26,
+          "shape": [
+            26
+          ],
+          "sum": 3.3520375262887683
+        },
+        "transformer.9.self_attn.v_proj.bias": {
+          "absmax": 0.31043756008148193,
+          "n": 832,
+          "shape": [
+            832
+          ],
+          "sum": -1.1375146265199874
+        },
+        "transformer.9.self_attn.v_proj.weight": {
+          "absmax": 0.7653810381889343,
+          "n": 692224,
+          "shape": [
+            832,
+            832
+          ],
+          "sum": -33.58951611513946
+        }
       }
     },
     "tokenizer": {
@@ -47,6 +1683,823 @@
         "bytes": 15842368,
         "filename": "model.safetensors",
         "sha256": "59d85f6af76a2c3b8240ea06cb21db4213b4eeca053f246b23e29cf832fc6bee"
+      },
+      "tensors": {
+        "decoder.0.ffn.w1.weight": {
+          "absmax": 2.889665365219116,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 547.2951781253569
+        },
+        "decoder.0.ffn.w2.weight": {
+          "absmax": 4.58046817779541,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -66.54021481287424
+        },
+        "decoder.0.ffn.w3.weight": {
+          "absmax": 1.9024595022201538,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -54.90372776609229
+        },
+        "decoder.0.norm1.weight": {
+          "absmax": 0.2637086510658264,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 5.721785574962269
+        },
+        "decoder.0.norm2.weight": {
+          "absmax": 0.5201863050460815,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 26.824826721363934
+        },
+        "decoder.0.self_attn.k_proj.bias": {
+          "absmax": 9.186097145080566,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 25.68068161146948
+        },
+        "decoder.0.self_attn.k_proj.weight": {
+          "absmax": 3.1317193508148193,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -55.952043373348715
+        },
+        "decoder.0.self_attn.out_proj.bias": {
+          "absmax": 0.7429463267326355,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -3.2262865589652847
+        },
+        "decoder.0.self_attn.out_proj.weight": {
+          "absmax": 4.3510050773620605,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -66.28849366806162
+        },
+        "decoder.0.self_attn.q_proj.bias": {
+          "absmax": 2.192908763885498,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -8.59917438426055
+        },
+        "decoder.0.self_attn.q_proj.weight": {
+          "absmax": 3.106748104095459,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 201.39424026420238
+        },
+        "decoder.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.0.self_attn.v_proj.bias": {
+          "absmax": 0.06669573485851288,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.16217344776396203
+        },
+        "decoder.0.self_attn.v_proj.weight": {
+          "absmax": 1.1657609939575195,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 24.382396487188146
+        },
+        "decoder.1.ffn.w1.weight": {
+          "absmax": 2.5734477043151855,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -68.21093313455049
+        },
+        "decoder.1.ffn.w2.weight": {
+          "absmax": 3.7115280628204346,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 167.28349068909029
+        },
+        "decoder.1.ffn.w3.weight": {
+          "absmax": 1.8948771953582764,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -46.87764489108474
+        },
+        "decoder.1.norm1.weight": {
+          "absmax": 0.4150628447532654,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 23.76090588553052
+        },
+        "decoder.1.norm2.weight": {
+          "absmax": 0.7563091516494751,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 39.39792509446852
+        },
+        "decoder.1.self_attn.k_proj.bias": {
+          "absmax": 4.367246627807617,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 22.803544661437627
+        },
+        "decoder.1.self_attn.k_proj.weight": {
+          "absmax": 4.438387870788574,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -144.2363634406156
+        },
+        "decoder.1.self_attn.out_proj.bias": {
+          "absmax": 0.40811634063720703,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.4434932356889476
+        },
+        "decoder.1.self_attn.out_proj.weight": {
+          "absmax": 1.9387761354446411,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 13.844056652788368
+        },
+        "decoder.1.self_attn.q_proj.bias": {
+          "absmax": 2.052366018295288,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.8834206135943532
+        },
+        "decoder.1.self_attn.q_proj.weight": {
+          "absmax": 3.3051393032073975,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 25.193887161854036
+        },
+        "decoder.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.1.self_attn.v_proj.bias": {
+          "absmax": 0.06938671320676804,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.18544696554818074
+        },
+        "decoder.1.self_attn.v_proj.weight": {
+          "absmax": 1.3420673608779907,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 103.18635827045773
+        },
+        "decoder.2.ffn.w1.weight": {
+          "absmax": 3.6710920333862305,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 1999.6486178283258
+        },
+        "decoder.2.ffn.w2.weight": {
+          "absmax": 6.404257774353027,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -89.73570930853339
+        },
+        "decoder.2.ffn.w3.weight": {
+          "absmax": 3.0427043437957764,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -207.09314555395076
+        },
+        "decoder.2.norm1.weight": {
+          "absmax": 0.7498147487640381,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 29.856145210273098
+        },
+        "decoder.2.norm2.weight": {
+          "absmax": 0.7322385311126709,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 42.00882710888982
+        },
+        "decoder.2.self_attn.k_proj.bias": {
+          "absmax": 3.766314744949341,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 12.412702339701355
+        },
+        "decoder.2.self_attn.k_proj.weight": {
+          "absmax": 4.070352077484131,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -222.93828298848985
+        },
+        "decoder.2.self_attn.out_proj.bias": {
+          "absmax": 0.649346113204956,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.4072150017555032
+        },
+        "decoder.2.self_attn.out_proj.weight": {
+          "absmax": 1.1819463968276978,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 55.36824327164277
+        },
+        "decoder.2.self_attn.q_proj.bias": {
+          "absmax": 1.2056909799575806,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 7.650344642956043
+        },
+        "decoder.2.self_attn.q_proj.weight": {
+          "absmax": 2.803328514099121,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 68.36931084887328
+        },
+        "decoder.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.2.self_attn.v_proj.bias": {
+          "absmax": 0.08097528666257858,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.06930805030970077
+        },
+        "decoder.2.self_attn.v_proj.weight": {
+          "absmax": 1.352112889289856,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 26.499409117365303
+        },
+        "embed.bias": {
+          "absmax": 4.374454498291016,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -18.536576007361873
+        },
+        "embed.weight": {
+          "absmax": 1.247774362564087,
+          "n": 1536,
+          "shape": [
+            256,
+            6
+          ],
+          "sum": -19.631584481539903
+        },
+        "encoder.0.ffn.w1.weight": {
+          "absmax": 3.9493539333343506,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 461.74714524302254
+        },
+        "encoder.0.ffn.w2.weight": {
+          "absmax": 2.077892780303955,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 50.04218079901534
+        },
+        "encoder.0.ffn.w3.weight": {
+          "absmax": 3.3850576877593994,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -23.374143055026252
+        },
+        "encoder.0.norm1.weight": {
+          "absmax": 0.28970059752464294,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 5.880692695536709
+        },
+        "encoder.0.norm2.weight": {
+          "absmax": 2.066648244857788,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 133.7769868458563
+        },
+        "encoder.0.self_attn.k_proj.bias": {
+          "absmax": 5.460906028747559,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 15.688670492512756
+        },
+        "encoder.0.self_attn.k_proj.weight": {
+          "absmax": 2.7277138233184814,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -56.16259969397839
+        },
+        "encoder.0.self_attn.out_proj.bias": {
+          "absmax": 0.9584341049194336,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.4096668777056038
+        },
+        "encoder.0.self_attn.out_proj.weight": {
+          "absmax": 2.4167377948760986,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -38.9971384589621
+        },
+        "encoder.0.self_attn.q_proj.bias": {
+          "absmax": 2.9467577934265137,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 7.113009363005403
+        },
+        "encoder.0.self_attn.q_proj.weight": {
+          "absmax": 4.088351726531982,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -61.62004929285345
+        },
+        "encoder.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.0.self_attn.v_proj.bias": {
+          "absmax": 0.20259030163288116,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.32684036794671556
+        },
+        "encoder.0.self_attn.v_proj.weight": {
+          "absmax": 1.2500616312026978,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 23.2877622349082
+        },
+        "encoder.1.ffn.w1.weight": {
+          "absmax": 3.404517412185669,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -237.95759814156526
+        },
+        "encoder.1.ffn.w2.weight": {
+          "absmax": 2.541635751724243,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -52.13650788206047
+        },
+        "encoder.1.ffn.w3.weight": {
+          "absmax": 3.193768262863159,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 38.977706310342
+        },
+        "encoder.1.norm1.weight": {
+          "absmax": 2.146890640258789,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 216.8458947869949
+        },
+        "encoder.1.norm2.weight": {
+          "absmax": 2.1243176460266113,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 193.0122531838715
+        },
+        "encoder.1.self_attn.k_proj.bias": {
+          "absmax": 9.4241361618042,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -5.908856625901535
+        },
+        "encoder.1.self_attn.k_proj.weight": {
+          "absmax": 2.0765295028686523,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 27.932980552826905
+        },
+        "encoder.1.self_attn.out_proj.bias": {
+          "absmax": 0.8587518334388733,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.8234830845030956
+        },
+        "encoder.1.self_attn.out_proj.weight": {
+          "absmax": 1.8447808027267456,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 167.26816932027577
+        },
+        "encoder.1.self_attn.q_proj.bias": {
+          "absmax": 2.2812087535858154,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -4.6926577696576715
+        },
+        "encoder.1.self_attn.q_proj.weight": {
+          "absmax": 2.2961909770965576,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -76.41875334816916
+        },
+        "encoder.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.1.self_attn.v_proj.bias": {
+          "absmax": 0.5285323262214661,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 3.1858688968932256
+        },
+        "encoder.1.self_attn.v_proj.weight": {
+          "absmax": 1.942638635635376,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -112.82771559721596
+        },
+        "encoder.2.ffn.w1.weight": {
+          "absmax": 3.316760301589966,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -79.55229992270597
+        },
+        "encoder.2.ffn.w2.weight": {
+          "absmax": 4.123638153076172,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 325.1464237884238
+        },
+        "encoder.2.ffn.w3.weight": {
+          "absmax": 2.9676928520202637,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 62.416809899495775
+        },
+        "encoder.2.norm1.weight": {
+          "absmax": 1.7742692232131958,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 188.28113016835414
+        },
+        "encoder.2.norm2.weight": {
+          "absmax": 2.7251479625701904,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 295.88386174477637
+        },
+        "encoder.2.self_attn.k_proj.bias": {
+          "absmax": 6.652103424072266,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 13.742034743539989
+        },
+        "encoder.2.self_attn.k_proj.weight": {
+          "absmax": 2.0886428356170654,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 87.48309631204575
+        },
+        "encoder.2.self_attn.out_proj.bias": {
+          "absmax": 0.9513014554977417,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -2.9930583760142326
+        },
+        "encoder.2.self_attn.out_proj.weight": {
+          "absmax": 2.726696252822876,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -47.49174747136243
+        },
+        "encoder.2.self_attn.q_proj.bias": {
+          "absmax": 1.1176583766937256,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -2.3902789727435447
+        },
+        "encoder.2.self_attn.q_proj.weight": {
+          "absmax": 2.37272310256958,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -77.6967859781198
+        },
+        "encoder.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.2.self_attn.v_proj.bias": {
+          "absmax": 0.4717331826686859,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.2391323582269251
+        },
+        "encoder.2.self_attn.v_proj.weight": {
+          "absmax": 2.283879041671753,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 69.83627776926642
+        },
+        "head.bias": {
+          "absmax": 0.11957437545061111,
+          "n": 6,
+          "shape": [
+            6
+          ],
+          "sum": -0.24898055638186634
+        },
+        "head.weight": {
+          "absmax": 0.36060261726379395,
+          "n": 1536,
+          "shape": [
+            6,
+            256
+          ],
+          "sum": 1.1359781390503372
+        },
+        "post_quant_embed.bias": {
+          "absmax": 1.8173414468765259,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -7.853123470209539
+        },
+        "post_quant_embed.weight": {
+          "absmax": 2.648430585861206,
+          "n": 5120,
+          "shape": [
+            256,
+            20
+          ],
+          "sum": 6.947298561950447
+        },
+        "post_quant_embed_pre.bias": {
+          "absmax": 1.8645217418670654,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 4.14772074080247
+        },
+        "post_quant_embed_pre.weight": {
+          "absmax": 2.3600869178771973,
+          "n": 2560,
+          "shape": [
+            256,
+            10
+          ],
+          "sum": 37.42674553082179
+        },
+        "quant_embed.bias": {
+          "absmax": 0.4507751762866974,
+          "n": 20,
+          "shape": [
+            20
+          ],
+          "sum": 0.17131538037210703
+        },
+        "quant_embed.weight": {
+          "absmax": 1.8068323135375977,
+          "n": 5120,
+          "shape": [
+            20,
+            256
+          ],
+          "sum": 38.59947675254807
+        },
+        "tokenizer.bsq.basis": {
+          "absmax": 524288.0,
+          "n": 20,
+          "shape": [
+            20
+          ],
+          "sum": 1048575.0
+        },
+        "tokenizer.bsq.group_basis": {
+          "absmax": 8.0,
+          "n": 4,
+          "shape": [
+            4
+          ],
+          "sum": 15.0
+        }
       }
     }
   },
@@ -71,6 +2524,690 @@
         "bytes": 16440776,
         "filename": "model.safetensors",
         "sha256": "a7d5f37e2e9fbd9891f7d7d4f72574512dd1f704fee14223e0a8cd0fbf54197c"
+      },
+      "tensors": {
+        "dep_layer.cross_attn.k_proj.bias": {
+          "absmax": 0.5872209668159485,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 2.3966065856548084
+        },
+        "dep_layer.cross_attn.k_proj.weight": {
+          "absmax": 0.5376936793327332,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 9.803927945891246
+        },
+        "dep_layer.cross_attn.out_proj.bias": {
+          "absmax": 2.6476993560791016,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 5.639720214705449
+        },
+        "dep_layer.cross_attn.out_proj.weight": {
+          "absmax": 1.8193895816802979,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 15.426297538286008
+        },
+        "dep_layer.cross_attn.q_proj.bias": {
+          "absmax": 1.0709561109542847,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 5.910712375305593
+        },
+        "dep_layer.cross_attn.q_proj.weight": {
+          "absmax": 0.3371464014053345,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -4.776371407158308
+        },
+        "dep_layer.cross_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "dep_layer.cross_attn.v_proj.bias": {
+          "absmax": 0.5786341428756714,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.8282973960594973
+        },
+        "dep_layer.cross_attn.v_proj.weight": {
+          "absmax": 0.49788898229599,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 8.693200050095015
+        },
+        "dep_layer.norm.weight": {
+          "absmax": 1.0578631162643433,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 144.53152505960315
+        },
+        "embedding.emb_s1.weight": {
+          "absmax": 0.5370782613754272,
+          "n": 262144,
+          "shape": [
+            1024,
+            256
+          ],
+          "sum": -140.77953378767336
+        },
+        "embedding.emb_s2.weight": {
+          "absmax": 0.5878310799598694,
+          "n": 262144,
+          "shape": [
+            1024,
+            256
+          ],
+          "sum": -32.92607092854586
+        },
+        "embedding.fusion_proj.bias": {
+          "absmax": 2.441098928451538,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.09024105570279062
+        },
+        "embedding.fusion_proj.weight": {
+          "absmax": 1.7674336433410645,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 9.933102576453734
+        },
+        "head.proj_s1.bias": {
+          "absmax": 2.7576205730438232,
+          "n": 1024,
+          "shape": [
+            1024
+          ],
+          "sum": -1994.1949762578588
+        },
+        "head.proj_s1.weight": {
+          "absmax": 3.3837523460388184,
+          "n": 262144,
+          "shape": [
+            1024,
+            256
+          ],
+          "sum": -4035.0025772165727
+        },
+        "head.proj_s2.bias": {
+          "absmax": 1.315081000328064,
+          "n": 1024,
+          "shape": [
+            1024
+          ],
+          "sum": -879.6896164342761
+        },
+        "head.proj_s2.weight": {
+          "absmax": 3.2467610836029053,
+          "n": 262144,
+          "shape": [
+            1024,
+            256
+          ],
+          "sum": -5949.63763348923
+        },
+        "norm.weight": {
+          "absmax": 1.0868319272994995,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 179.58467833697796
+        },
+        "time_emb.day_embed.weight": {
+          "absmax": 2.5690670013427734,
+          "n": 8192,
+          "shape": [
+            32,
+            256
+          ],
+          "sum": -43.23658704063564
+        },
+        "time_emb.hour_embed.weight": {
+          "absmax": 2.984727621078491,
+          "n": 6144,
+          "shape": [
+            24,
+            256
+          ],
+          "sum": 18.385302436556685
+        },
+        "time_emb.minute_embed.weight": {
+          "absmax": 3.09582257270813,
+          "n": 15360,
+          "shape": [
+            60,
+            256
+          ],
+          "sum": -94.73979026528468
+        },
+        "time_emb.month_embed.weight": {
+          "absmax": 2.285489320755005,
+          "n": 3328,
+          "shape": [
+            13,
+            256
+          ],
+          "sum": -9.558761209911609
+        },
+        "time_emb.weekday_embed.weight": {
+          "absmax": 2.652432918548584,
+          "n": 1792,
+          "shape": [
+            7,
+            256
+          ],
+          "sum": -20.87099012429826
+        },
+        "transformer.0.ffn.w1.weight": {
+          "absmax": 1.0365562438964844,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 293.02034180196506
+        },
+        "transformer.0.ffn.w2.weight": {
+          "absmax": 0.9889053106307983,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -1.2510487873984744
+        },
+        "transformer.0.ffn.w3.weight": {
+          "absmax": 0.9385076761245728,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 1.0632036247159249
+        },
+        "transformer.0.norm1.weight": {
+          "absmax": 0.8510282039642334,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 72.89256810955703
+        },
+        "transformer.0.norm2.weight": {
+          "absmax": 1.460479974746704,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 143.44591290690005
+        },
+        "transformer.0.self_attn.k_proj.bias": {
+          "absmax": 2.1201493740081787,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -8.292931036558002
+        },
+        "transformer.0.self_attn.k_proj.weight": {
+          "absmax": 0.8693628311157227,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 21.059472749581516
+        },
+        "transformer.0.self_attn.out_proj.bias": {
+          "absmax": 1.7202064990997314,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.889243352212361
+        },
+        "transformer.0.self_attn.out_proj.weight": {
+          "absmax": 1.1709750890731812,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 48.89993491539167
+        },
+        "transformer.0.self_attn.q_proj.bias": {
+          "absmax": 1.0079467296600342,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -4.851415331359021
+        },
+        "transformer.0.self_attn.q_proj.weight": {
+          "absmax": 0.9017735123634338,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 25.762428654913492
+        },
+        "transformer.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.0.self_attn.v_proj.bias": {
+          "absmax": 0.16019469499588013,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.6792239912465448
+        },
+        "transformer.0.self_attn.v_proj.weight": {
+          "absmax": 0.7218211889266968,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -87.43108039520075
+        },
+        "transformer.1.ffn.w1.weight": {
+          "absmax": 1.7111856937408447,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 98.99735307761352
+        },
+        "transformer.1.ffn.w2.weight": {
+          "absmax": 1.6403592824935913,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -14.075316382307506
+        },
+        "transformer.1.ffn.w3.weight": {
+          "absmax": 1.4736186265945435,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 7.525238726303769
+        },
+        "transformer.1.norm1.weight": {
+          "absmax": 0.6315051913261414,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 85.53979421779513
+        },
+        "transformer.1.norm2.weight": {
+          "absmax": 0.6821423172950745,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 114.89097820967436
+        },
+        "transformer.1.self_attn.k_proj.bias": {
+          "absmax": 3.8096437454223633,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 11.754966131644323
+        },
+        "transformer.1.self_attn.k_proj.weight": {
+          "absmax": 1.4739406108856201,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 33.9838512570127
+        },
+        "transformer.1.self_attn.out_proj.bias": {
+          "absmax": 1.6560479402542114,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.2649237585064839
+        },
+        "transformer.1.self_attn.out_proj.weight": {
+          "absmax": 0.8922218084335327,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -60.17950220389861
+        },
+        "transformer.1.self_attn.q_proj.bias": {
+          "absmax": 1.7589430809020996,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -3.520212888950482
+        },
+        "transformer.1.self_attn.q_proj.weight": {
+          "absmax": 1.5022026300430298,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 12.299238589231209
+        },
+        "transformer.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.1.self_attn.v_proj.bias": {
+          "absmax": 0.13955923914909363,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.02583717688685283
+        },
+        "transformer.1.self_attn.v_proj.weight": {
+          "absmax": 0.9113864302635193,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -4.096450793290387
+        },
+        "transformer.2.ffn.w1.weight": {
+          "absmax": 0.9695428013801575,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 71.29083993870381
+        },
+        "transformer.2.ffn.w2.weight": {
+          "absmax": 2.244373321533203,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 121.24836520116332
+        },
+        "transformer.2.ffn.w3.weight": {
+          "absmax": 0.9764136672019958,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 38.20652835525755
+        },
+        "transformer.2.norm1.weight": {
+          "absmax": 0.5182197093963623,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 91.89246133342385
+        },
+        "transformer.2.norm2.weight": {
+          "absmax": 0.596291720867157,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 111.14070737361908
+        },
+        "transformer.2.self_attn.k_proj.bias": {
+          "absmax": 2.835768461227417,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.17469625861849636
+        },
+        "transformer.2.self_attn.k_proj.weight": {
+          "absmax": 1.0219249725341797,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 9.037320948694969
+        },
+        "transformer.2.self_attn.out_proj.bias": {
+          "absmax": 1.185011625289917,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.5773932869778946
+        },
+        "transformer.2.self_attn.out_proj.weight": {
+          "absmax": 1.2194552421569824,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -18.00972508991488
+        },
+        "transformer.2.self_attn.q_proj.bias": {
+          "absmax": 0.9258379340171814,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 6.492273021314759
+        },
+        "transformer.2.self_attn.q_proj.weight": {
+          "absmax": 0.7437154650688171,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -2.7386680956778946
+        },
+        "transformer.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.2.self_attn.v_proj.bias": {
+          "absmax": 0.1894523650407791,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 2.403181672649225
+        },
+        "transformer.2.self_attn.v_proj.weight": {
+          "absmax": 0.9920733571052551,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 18.976464923804883
+        },
+        "transformer.3.ffn.w1.weight": {
+          "absmax": 1.2578444480895996,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 105.48250922681007
+        },
+        "transformer.3.ffn.w2.weight": {
+          "absmax": 1.2732282876968384,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 2.010896398584464
+        },
+        "transformer.3.ffn.w3.weight": {
+          "absmax": 0.9618609547615051,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 7.085953716489939
+        },
+        "transformer.3.norm1.weight": {
+          "absmax": 0.5910360217094421,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 96.93239962309599
+        },
+        "transformer.3.norm2.weight": {
+          "absmax": 0.5443372130393982,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 98.3564053028822
+        },
+        "transformer.3.self_attn.k_proj.bias": {
+          "absmax": 3.1144213676452637,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -4.695062733197119
+        },
+        "transformer.3.self_attn.k_proj.weight": {
+          "absmax": 1.2776724100112915,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -27.464269251461474
+        },
+        "transformer.3.self_attn.out_proj.bias": {
+          "absmax": 0.75919508934021,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.07209680913365446
+        },
+        "transformer.3.self_attn.out_proj.weight": {
+          "absmax": 1.2782177925109863,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -30.314710223326188
+        },
+        "transformer.3.self_attn.q_proj.bias": {
+          "absmax": 1.2680350542068481,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.8229619610356167
+        },
+        "transformer.3.self_attn.q_proj.weight": {
+          "absmax": 0.8179253339767456,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -26.81982595778095
+        },
+        "transformer.3.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.3.self_attn.v_proj.bias": {
+          "absmax": 0.16316261887550354,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.2339294553312357
+        },
+        "transformer.3.self_attn.v_proj.weight": {
+          "absmax": 1.0262047052383423,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -13.717727279345809
+        }
       }
     },
     "tokenizer": {
@@ -98,6 +3235,823 @@
         "bytes": 15842376,
         "filename": "model.safetensors",
         "sha256": "b97ec46b3b72160509e289183eaf7bdf5f0dac5bb9b49522f6d46638a99a8717"
+      },
+      "tensors": {
+        "decoder.0.ffn.w1.weight": {
+          "absmax": 1.0782077312469482,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 789.4176953527663
+        },
+        "decoder.0.ffn.w2.weight": {
+          "absmax": 0.8925713300704956,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -24.58373306227722
+        },
+        "decoder.0.ffn.w3.weight": {
+          "absmax": 0.7374971508979797,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -88.77690571314508
+        },
+        "decoder.0.norm1.weight": {
+          "absmax": 0.7973080277442932,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 54.48480940659647
+        },
+        "decoder.0.norm2.weight": {
+          "absmax": 0.9068634510040283,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 73.54537510126829
+        },
+        "decoder.0.self_attn.k_proj.bias": {
+          "absmax": 2.9112601280212402,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 19.513917740201578
+        },
+        "decoder.0.self_attn.k_proj.weight": {
+          "absmax": 1.2169181108474731,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 31.53446867547018
+        },
+        "decoder.0.self_attn.out_proj.bias": {
+          "absmax": 1.441877007484436,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.8403511001379229
+        },
+        "decoder.0.self_attn.out_proj.weight": {
+          "absmax": 1.2856674194335938,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 46.54957571991177
+        },
+        "decoder.0.self_attn.q_proj.bias": {
+          "absmax": 0.6588014960289001,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.6429173432552489
+        },
+        "decoder.0.self_attn.q_proj.weight": {
+          "absmax": 0.9895105957984924,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 3.316507927204327
+        },
+        "decoder.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.0.self_attn.v_proj.bias": {
+          "absmax": 0.3577374517917633,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.8474422442232026
+        },
+        "decoder.0.self_attn.v_proj.weight": {
+          "absmax": 0.48469582200050354,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 16.52668774562543
+        },
+        "decoder.1.ffn.w1.weight": {
+          "absmax": 1.1005481481552124,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -517.509945430458
+        },
+        "decoder.1.ffn.w2.weight": {
+          "absmax": 1.0331380367279053,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -70.11735456934355
+        },
+        "decoder.1.ffn.w3.weight": {
+          "absmax": 0.8268617987632751,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 31.811324848742856
+        },
+        "decoder.1.norm1.weight": {
+          "absmax": 0.6600159406661987,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 44.01622607932586
+        },
+        "decoder.1.norm2.weight": {
+          "absmax": 0.8831180930137634,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 75.11021694540977
+        },
+        "decoder.1.self_attn.k_proj.bias": {
+          "absmax": 4.300738334655762,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 10.256454506306909
+        },
+        "decoder.1.self_attn.k_proj.weight": {
+          "absmax": 1.709246039390564,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 2.5350314304672565
+        },
+        "decoder.1.self_attn.out_proj.bias": {
+          "absmax": 0.5852110385894775,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.8400368395887199
+        },
+        "decoder.1.self_attn.out_proj.weight": {
+          "absmax": 0.5933014154434204,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 3.25968141896152
+        },
+        "decoder.1.self_attn.q_proj.bias": {
+          "absmax": 1.0595955848693848,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -2.1541419843561016
+        },
+        "decoder.1.self_attn.q_proj.weight": {
+          "absmax": 1.110413908958435,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -23.401165741905032
+        },
+        "decoder.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.1.self_attn.v_proj.bias": {
+          "absmax": 0.11653289943933487,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.11001522291917354
+        },
+        "decoder.1.self_attn.v_proj.weight": {
+          "absmax": 0.5409684181213379,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -7.006437050504019
+        },
+        "decoder.2.ffn.w1.weight": {
+          "absmax": 1.2193527221679688,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 63.16426824509995
+        },
+        "decoder.2.ffn.w2.weight": {
+          "absmax": 1.5063923597335815,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 44.89287500885433
+        },
+        "decoder.2.ffn.w3.weight": {
+          "absmax": 1.2276008129119873,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 60.65940270711289
+        },
+        "decoder.2.norm1.weight": {
+          "absmax": 0.7843839526176453,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 61.11486789956689
+        },
+        "decoder.2.norm2.weight": {
+          "absmax": 0.9190032482147217,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 82.8390926271677
+        },
+        "decoder.2.self_attn.k_proj.bias": {
+          "absmax": 3.3158373832702637,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -30.206625727703795
+        },
+        "decoder.2.self_attn.k_proj.weight": {
+          "absmax": 1.1410126686096191,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 24.823652260041854
+        },
+        "decoder.2.self_attn.out_proj.bias": {
+          "absmax": 0.45214080810546875,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.9880861483688932
+        },
+        "decoder.2.self_attn.out_proj.weight": {
+          "absmax": 0.8416212201118469,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -0.6839324271277292
+        },
+        "decoder.2.self_attn.q_proj.bias": {
+          "absmax": 0.8007956147193909,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -3.995187364402227
+        },
+        "decoder.2.self_attn.q_proj.weight": {
+          "absmax": 1.2646818161010742,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 36.96762245965141
+        },
+        "decoder.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.2.self_attn.v_proj.bias": {
+          "absmax": 0.1040603294968605,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.4738850737339817
+        },
+        "decoder.2.self_attn.v_proj.weight": {
+          "absmax": 0.6076485514640808,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 1.5272973719618221
+        },
+        "embed.bias": {
+          "absmax": 0.6131306886672974,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -4.658862292999402
+        },
+        "embed.weight": {
+          "absmax": 1.0256978273391724,
+          "n": 1536,
+          "shape": [
+            256,
+            6
+          ],
+          "sum": -22.71486574676237
+        },
+        "encoder.0.ffn.w1.weight": {
+          "absmax": 1.352620005607605,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -418.43112920225633
+        },
+        "encoder.0.ffn.w2.weight": {
+          "absmax": 0.950059711933136,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -45.60423264493937
+        },
+        "encoder.0.ffn.w3.weight": {
+          "absmax": 1.5458124876022339,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -25.94426656238943
+        },
+        "encoder.0.norm1.weight": {
+          "absmax": 1.8339568376541138,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 225.7363073080778
+        },
+        "encoder.0.norm2.weight": {
+          "absmax": 1.1211479902267456,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 153.88886829838157
+        },
+        "encoder.0.self_attn.k_proj.bias": {
+          "absmax": 1.4125771522521973,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -2.456101502131787
+        },
+        "encoder.0.self_attn.k_proj.weight": {
+          "absmax": 1.206915259361267,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 8.62037528075507
+        },
+        "encoder.0.self_attn.out_proj.bias": {
+          "absmax": 0.35674965381622314,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -4.021385533866123
+        },
+        "encoder.0.self_attn.out_proj.weight": {
+          "absmax": 1.0951557159423828,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 34.55934597645455
+        },
+        "encoder.0.self_attn.q_proj.bias": {
+          "absmax": 1.0979779958724976,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 3.548676766164135
+        },
+        "encoder.0.self_attn.q_proj.weight": {
+          "absmax": 1.1925327777862549,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -34.74276060331033
+        },
+        "encoder.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.0.self_attn.v_proj.bias": {
+          "absmax": 0.6220759749412537,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -3.772892481123563
+        },
+        "encoder.0.self_attn.v_proj.weight": {
+          "absmax": 1.164702296257019,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -16.44549942089168
+        },
+        "encoder.1.ffn.w1.weight": {
+          "absmax": 1.6484936475753784,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 371.2304803733215
+        },
+        "encoder.1.ffn.w2.weight": {
+          "absmax": 1.087460994720459,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 33.04030278945277
+        },
+        "encoder.1.ffn.w3.weight": {
+          "absmax": 1.3754178285598755,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -36.10984300134021
+        },
+        "encoder.1.norm1.weight": {
+          "absmax": 1.3927255868911743,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 193.8445602208376
+        },
+        "encoder.1.norm2.weight": {
+          "absmax": 1.7248908281326294,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 214.93284164369106
+        },
+        "encoder.1.self_attn.k_proj.bias": {
+          "absmax": 5.003859996795654,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -20.570210999430856
+        },
+        "encoder.1.self_attn.k_proj.weight": {
+          "absmax": 1.9411484003067017,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 19.162060556907477
+        },
+        "encoder.1.self_attn.out_proj.bias": {
+          "absmax": 0.3867915868759155,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.4924839936429635
+        },
+        "encoder.1.self_attn.out_proj.weight": {
+          "absmax": 0.9581656455993652,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -12.252087089999804
+        },
+        "encoder.1.self_attn.q_proj.bias": {
+          "absmax": 1.3025906085968018,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -5.9270214241114445
+        },
+        "encoder.1.self_attn.q_proj.weight": {
+          "absmax": 1.1805816888809204,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -8.549728254457477
+        },
+        "encoder.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.1.self_attn.v_proj.bias": {
+          "absmax": 0.15876711905002594,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.42614621855318546
+        },
+        "encoder.1.self_attn.v_proj.weight": {
+          "absmax": 1.2582991123199463,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 5.190950478678161
+        },
+        "encoder.2.ffn.w1.weight": {
+          "absmax": 2.2604739665985107,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 277.74875016688486
+        },
+        "encoder.2.ffn.w2.weight": {
+          "absmax": 1.8313260078430176,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 41.599163318197725
+        },
+        "encoder.2.ffn.w3.weight": {
+          "absmax": 1.8643882274627686,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 33.76293919418481
+        },
+        "encoder.2.norm1.weight": {
+          "absmax": 1.2191672325134277,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 177.526388899656
+        },
+        "encoder.2.norm2.weight": {
+          "absmax": 2.258636951446533,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 351.8837093412876
+        },
+        "encoder.2.self_attn.k_proj.bias": {
+          "absmax": 5.260010242462158,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 18.72149789170362
+        },
+        "encoder.2.self_attn.k_proj.weight": {
+          "absmax": 1.3959680795669556,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -9.8611906579481
+        },
+        "encoder.2.self_attn.out_proj.bias": {
+          "absmax": 0.3112555742263794,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.9731166760902852
+        },
+        "encoder.2.self_attn.out_proj.weight": {
+          "absmax": 1.2253391742706299,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 23.003511693107157
+        },
+        "encoder.2.self_attn.q_proj.bias": {
+          "absmax": 0.7553476691246033,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.097940185922198
+        },
+        "encoder.2.self_attn.q_proj.weight": {
+          "absmax": 1.2431570291519165,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -16.67270447022952
+        },
+        "encoder.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.2.self_attn.v_proj.bias": {
+          "absmax": 0.4075666069984436,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.09735957987140864
+        },
+        "encoder.2.self_attn.v_proj.weight": {
+          "absmax": 1.339382529258728,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -28.36131516174794
+        },
+        "head.bias": {
+          "absmax": 0.0423918180167675,
+          "n": 6,
+          "shape": [
+            6
+          ],
+          "sum": 0.05046806298196316
+        },
+        "head.weight": {
+          "absmax": 0.15052412450313568,
+          "n": 1536,
+          "shape": [
+            6,
+            256
+          ],
+          "sum": 0.7706456476021231
+        },
+        "post_quant_embed.bias": {
+          "absmax": 1.0863481760025024,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 3.4746321226703003
+        },
+        "post_quant_embed.weight": {
+          "absmax": 0.994102954864502,
+          "n": 5120,
+          "shape": [
+            256,
+            20
+          ],
+          "sum": 6.217467521219078
+        },
+        "post_quant_embed_pre.bias": {
+          "absmax": 1.5846946239471436,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.8954997390246717
+        },
+        "post_quant_embed_pre.weight": {
+          "absmax": 1.180506706237793,
+          "n": 2560,
+          "shape": [
+            256,
+            10
+          ],
+          "sum": 18.1600352857713
+        },
+        "quant_embed.bias": {
+          "absmax": 0.20814524590969086,
+          "n": 20,
+          "shape": [
+            20
+          ],
+          "sum": -0.35097616584971547
+        },
+        "quant_embed.weight": {
+          "absmax": 0.7505102157592773,
+          "n": 5120,
+          "shape": [
+            20,
+            256
+          ],
+          "sum": 14.114699102900886
+        },
+        "tokenizer.bsq.basis": {
+          "absmax": 524288.0,
+          "n": 20,
+          "shape": [
+            20
+          ],
+          "sum": 1048575.0
+        },
+        "tokenizer.bsq.group_basis": {
+          "absmax": 16.0,
+          "n": 5,
+          "shape": [
+            5
+          ],
+          "sum": 31.0
+        }
       }
     }
   },
@@ -122,6 +4076,1166 @@
         "bytes": 98980656,
         "filename": "model.safetensors",
         "sha256": "b082dfcbd8e8c142a725c8bbb99781802f38fec81210e13479effb32b3c3e020"
+      },
+      "tensors": {
+        "dep_layer.cross_attn.k_proj.bias": {
+          "absmax": 1.2203527688980103,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 7.1766001612413675
+        },
+        "dep_layer.cross_attn.k_proj.weight": {
+          "absmax": 1.6615650653839111,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -16.891558894210846
+        },
+        "dep_layer.cross_attn.out_proj.bias": {
+          "absmax": 5.219165325164795,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 4.368397943966556
+        },
+        "dep_layer.cross_attn.out_proj.weight": {
+          "absmax": 3.873887538909912,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -18.98926519504346
+        },
+        "dep_layer.cross_attn.q_proj.bias": {
+          "absmax": 1.823843002319336,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -0.08424967719474807
+        },
+        "dep_layer.cross_attn.q_proj.weight": {
+          "absmax": 0.3413252830505371,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 2.7957253512925604
+        },
+        "dep_layer.cross_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 64,
+          "shape": [
+            64
+          ],
+          "sum": 7.459954202655354
+        },
+        "dep_layer.cross_attn.v_proj.bias": {
+          "absmax": 0.5626494884490967,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -0.0041724068723851815
+        },
+        "dep_layer.cross_attn.v_proj.weight": {
+          "absmax": 0.37861448526382446,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -6.773985867924239
+        },
+        "dep_layer.norm.weight": {
+          "absmax": 1.5146373510360718,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 200.5089565794915
+        },
+        "embedding.emb_s1.weight": {
+          "absmax": 0.9634122848510742,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -531.5981890959746
+        },
+        "embedding.emb_s2.weight": {
+          "absmax": 0.6666150093078613,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": 590.4992469019982
+        },
+        "embedding.fusion_proj.bias": {
+          "absmax": 4.4589457511901855,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 11.43606903685577
+        },
+        "embedding.fusion_proj.weight": {
+          "absmax": 4.369833469390869,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 11.172302740218939
+        },
+        "head.proj_s1.bias": {
+          "absmax": 7.645956039428711,
+          "n": 1024,
+          "shape": [
+            1024
+          ],
+          "sum": -6191.000842511654
+        },
+        "head.proj_s1.weight": {
+          "absmax": 7.059927463531494,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -8382.530082953148
+        },
+        "head.proj_s2.bias": {
+          "absmax": 4.868954658508301,
+          "n": 1024,
+          "shape": [
+            1024
+          ],
+          "sum": -4178.423489816487
+        },
+        "head.proj_s2.weight": {
+          "absmax": 6.823425769805908,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": 12250.732939807851
+        },
+        "norm.weight": {
+          "absmax": 0.7742195725440979,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 219.5814349297434
+        },
+        "time_emb.day_embed.weight": {
+          "absmax": 6.256076812744141,
+          "n": 16384,
+          "shape": [
+            32,
+            512
+          ],
+          "sum": 19.43365635835744
+        },
+        "time_emb.hour_embed.weight": {
+          "absmax": 6.719648838043213,
+          "n": 12288,
+          "shape": [
+            24,
+            512
+          ],
+          "sum": -77.11437203219612
+        },
+        "time_emb.minute_embed.weight": {
+          "absmax": 5.506782531738281,
+          "n": 30720,
+          "shape": [
+            60,
+            512
+          ],
+          "sum": -28.093200431685545
+        },
+        "time_emb.month_embed.weight": {
+          "absmax": 4.97242546081543,
+          "n": 6656,
+          "shape": [
+            13,
+            512
+          ],
+          "sum": 24.357885349396383
+        },
+        "time_emb.weekday_embed.weight": {
+          "absmax": 4.269534111022949,
+          "n": 3584,
+          "shape": [
+            7,
+            512
+          ],
+          "sum": 10.925587604520842
+        },
+        "transformer.0.ffn.w1.weight": {
+          "absmax": 1.772857427597046,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -834.4080747608843
+        },
+        "transformer.0.ffn.w2.weight": {
+          "absmax": 2.3650505542755127,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": -70.01272213489219
+        },
+        "transformer.0.ffn.w3.weight": {
+          "absmax": 1.5667794942855835,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -29.83048090099865
+        },
+        "transformer.0.norm1.weight": {
+          "absmax": 0.896154522895813,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 137.13739850372076
+        },
+        "transformer.0.norm2.weight": {
+          "absmax": 1.8516117334365845,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 227.30264449864626
+        },
+        "transformer.0.self_attn.k_proj.bias": {
+          "absmax": 1.5665380954742432,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 9.813465961487964
+        },
+        "transformer.0.self_attn.k_proj.weight": {
+          "absmax": 0.8477292060852051,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 42.55555223254618
+        },
+        "transformer.0.self_attn.out_proj.bias": {
+          "absmax": 3.8061394691467285,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 13.308156066515949
+        },
+        "transformer.0.self_attn.out_proj.weight": {
+          "absmax": 2.2882752418518066,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 54.961721875132525
+        },
+        "transformer.0.self_attn.q_proj.bias": {
+          "absmax": 1.406673550605774,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -2.7507598104821227
+        },
+        "transformer.0.self_attn.q_proj.weight": {
+          "absmax": 0.870770275592804,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 26.99590631275197
+        },
+        "transformer.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.0.self_attn.v_proj.bias": {
+          "absmax": 0.3118564486503601,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -2.744109363244206
+        },
+        "transformer.0.self_attn.v_proj.weight": {
+          "absmax": 1.0787701606750488,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -111.93258513935041
+        },
+        "transformer.1.ffn.w1.weight": {
+          "absmax": 1.3312019109725952,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -1069.924961099407
+        },
+        "transformer.1.ffn.w2.weight": {
+          "absmax": 2.685045003890991,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": -1.2446034862163344
+        },
+        "transformer.1.ffn.w3.weight": {
+          "absmax": 1.8100937604904175,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": 4.6825209702178086
+        },
+        "transformer.1.norm1.weight": {
+          "absmax": 0.5469470620155334,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 122.46532559767365
+        },
+        "transformer.1.norm2.weight": {
+          "absmax": 0.7184507846832275,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 193.74431594461203
+        },
+        "transformer.1.self_attn.k_proj.bias": {
+          "absmax": 5.078593730926514,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 17.090394854312763
+        },
+        "transformer.1.self_attn.k_proj.weight": {
+          "absmax": 1.5850298404693604,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 140.25417151524636
+        },
+        "transformer.1.self_attn.out_proj.bias": {
+          "absmax": 3.089672565460205,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 13.18153329071356
+        },
+        "transformer.1.self_attn.out_proj.weight": {
+          "absmax": 1.8539036512374878,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -118.785273148729
+        },
+        "transformer.1.self_attn.q_proj.bias": {
+          "absmax": 3.4098758697509766,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -7.080645596055547
+        },
+        "transformer.1.self_attn.q_proj.weight": {
+          "absmax": 1.9734002351760864,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 49.928919874836964
+        },
+        "transformer.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.1.self_attn.v_proj.bias": {
+          "absmax": 0.32664844393730164,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -2.870464434585301
+        },
+        "transformer.1.self_attn.v_proj.weight": {
+          "absmax": 1.7723276615142822,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -124.67448743866089
+        },
+        "transformer.2.ffn.w1.weight": {
+          "absmax": 1.7343724966049194,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -1406.3961892227007
+        },
+        "transformer.2.ffn.w2.weight": {
+          "absmax": 3.1959667205810547,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 252.95810205861076
+        },
+        "transformer.2.ffn.w3.weight": {
+          "absmax": 1.7959524393081665,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -106.45503160440063
+        },
+        "transformer.2.norm1.weight": {
+          "absmax": 0.44834837317466736,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 128.86999275535345
+        },
+        "transformer.2.norm2.weight": {
+          "absmax": 0.6077088713645935,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 192.9328271485865
+        },
+        "transformer.2.self_attn.k_proj.bias": {
+          "absmax": 3.273106813430786,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 2.916296720824903
+        },
+        "transformer.2.self_attn.k_proj.weight": {
+          "absmax": 1.814737319946289,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -46.42431527569747
+        },
+        "transformer.2.self_attn.out_proj.bias": {
+          "absmax": 2.5040693283081055,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 13.400424830331758
+        },
+        "transformer.2.self_attn.out_proj.weight": {
+          "absmax": 1.5650427341461182,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -22.1794764861134
+        },
+        "transformer.2.self_attn.q_proj.bias": {
+          "absmax": 3.179908514022827,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 3.7042721662437543
+        },
+        "transformer.2.self_attn.q_proj.weight": {
+          "absmax": 2.3409264087677,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -3.049523558822642
+        },
+        "transformer.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.2.self_attn.v_proj.bias": {
+          "absmax": 0.3789658844470978,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -0.8837345775973517
+        },
+        "transformer.2.self_attn.v_proj.weight": {
+          "absmax": 1.2962158918380737,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -87.92278026488907
+        },
+        "transformer.3.ffn.w1.weight": {
+          "absmax": 1.4451690912246704,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -1928.5257743382208
+        },
+        "transformer.3.ffn.w2.weight": {
+          "absmax": 3.8287296295166016,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 151.0391116974842
+        },
+        "transformer.3.ffn.w3.weight": {
+          "absmax": 1.5275752544403076,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": 164.16180476926792
+        },
+        "transformer.3.norm1.weight": {
+          "absmax": 0.45823848247528076,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 134.59518751874566
+        },
+        "transformer.3.norm2.weight": {
+          "absmax": 0.6081600189208984,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 205.7876052260399
+        },
+        "transformer.3.self_attn.k_proj.bias": {
+          "absmax": 4.450992107391357,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 12.715829570050118
+        },
+        "transformer.3.self_attn.k_proj.weight": {
+          "absmax": 1.8929511308670044,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -106.34880678812164
+        },
+        "transformer.3.self_attn.out_proj.bias": {
+          "absmax": 1.8834924697875977,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 12.127901239087805
+        },
+        "transformer.3.self_attn.out_proj.weight": {
+          "absmax": 1.9889202117919922,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -14.054440442160114
+        },
+        "transformer.3.self_attn.q_proj.bias": {
+          "absmax": 1.9143179655075073,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 5.3769837441213895
+        },
+        "transformer.3.self_attn.q_proj.weight": {
+          "absmax": 1.4391796588897705,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 56.40858120630358
+        },
+        "transformer.3.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.3.self_attn.v_proj.bias": {
+          "absmax": 0.5223818421363831,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -0.2593205682642292
+        },
+        "transformer.3.self_attn.v_proj.weight": {
+          "absmax": 1.5083019733428955,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 115.59103156823039
+        },
+        "transformer.4.ffn.w1.weight": {
+          "absmax": 1.3758420944213867,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -2415.316541200363
+        },
+        "transformer.4.ffn.w2.weight": {
+          "absmax": 3.571747064590454,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 36.74597414388879
+        },
+        "transformer.4.ffn.w3.weight": {
+          "absmax": 1.5373862981796265,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": 219.16124921194015
+        },
+        "transformer.4.norm1.weight": {
+          "absmax": 0.5152651071548462,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 157.6381903924048
+        },
+        "transformer.4.norm2.weight": {
+          "absmax": 0.6521919369697571,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 228.62068306282163
+        },
+        "transformer.4.self_attn.k_proj.bias": {
+          "absmax": 4.775662899017334,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 9.194900116133795
+        },
+        "transformer.4.self_attn.k_proj.weight": {
+          "absmax": 1.823379397392273,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -112.88097420137098
+        },
+        "transformer.4.self_attn.out_proj.bias": {
+          "absmax": 1.4004120826721191,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 7.608548138116021
+        },
+        "transformer.4.self_attn.out_proj.weight": {
+          "absmax": 1.8658738136291504,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -14.10425375367879
+        },
+        "transformer.4.self_attn.q_proj.bias": {
+          "absmax": 2.4373812675476074,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 2.740032897971105
+        },
+        "transformer.4.self_attn.q_proj.weight": {
+          "absmax": 1.920286774635315,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 118.67801920465718
+        },
+        "transformer.4.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.4.self_attn.v_proj.bias": {
+          "absmax": 0.46074455976486206,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 2.5866920528933406
+        },
+        "transformer.4.self_attn.v_proj.weight": {
+          "absmax": 1.2316083908081055,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 217.5843759168472
+        },
+        "transformer.5.ffn.w1.weight": {
+          "absmax": 1.167425513267517,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -2512.95415702478
+        },
+        "transformer.5.ffn.w2.weight": {
+          "absmax": 6.066315650939941,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 95.65798015547452
+        },
+        "transformer.5.ffn.w3.weight": {
+          "absmax": 1.9909162521362305,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -84.82737239146536
+        },
+        "transformer.5.norm1.weight": {
+          "absmax": 0.49100810289382935,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 160.18983887508512
+        },
+        "transformer.5.norm2.weight": {
+          "absmax": 0.7430610060691833,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 257.49633926153183
+        },
+        "transformer.5.self_attn.k_proj.bias": {
+          "absmax": 3.378082275390625,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -11.736841927922796
+        },
+        "transformer.5.self_attn.k_proj.weight": {
+          "absmax": 1.6003955602645874,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -31.279263826546412
+        },
+        "transformer.5.self_attn.out_proj.bias": {
+          "absmax": 1.051903247833252,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 4.822201562405098
+        },
+        "transformer.5.self_attn.out_proj.weight": {
+          "absmax": 2.5074758529663086,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -70.60771728087116
+        },
+        "transformer.5.self_attn.q_proj.bias": {
+          "absmax": 1.5865439176559448,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -7.374976251681801
+        },
+        "transformer.5.self_attn.q_proj.weight": {
+          "absmax": 1.0495331287384033,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -143.77591173700262
+        },
+        "transformer.5.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.5.self_attn.v_proj.bias": {
+          "absmax": 0.4641232192516327,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -3.2689303142396966
+        },
+        "transformer.5.self_attn.v_proj.weight": {
+          "absmax": 1.5045193433761597,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -1.5085668969937842
+        },
+        "transformer.6.ffn.w1.weight": {
+          "absmax": 1.534134030342102,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -2075.1481416854217
+        },
+        "transformer.6.ffn.w2.weight": {
+          "absmax": 6.967829704284668,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 81.90716717585997
+        },
+        "transformer.6.ffn.w3.weight": {
+          "absmax": 2.593564748764038,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": 29.42326549379274
+        },
+        "transformer.6.norm1.weight": {
+          "absmax": 0.5349342226982117,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 188.16014622151852
+        },
+        "transformer.6.norm2.weight": {
+          "absmax": 0.8149439096450806,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 285.0151711553335
+        },
+        "transformer.6.self_attn.k_proj.bias": {
+          "absmax": 3.949187994003296,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -8.089272616592098
+        },
+        "transformer.6.self_attn.k_proj.weight": {
+          "absmax": 1.5306447744369507,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 3.2114196391042924
+        },
+        "transformer.6.self_attn.out_proj.bias": {
+          "absmax": 0.8659306168556213,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 1.5293713217688492
+        },
+        "transformer.6.self_attn.out_proj.weight": {
+          "absmax": 2.514488458633423,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -8.411889697843478
+        },
+        "transformer.6.self_attn.q_proj.bias": {
+          "absmax": 1.7717472314834595,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -8.055485945208602
+        },
+        "transformer.6.self_attn.q_proj.weight": {
+          "absmax": 1.2300736904144287,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -36.64407182068993
+        },
+        "transformer.6.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.6.self_attn.v_proj.bias": {
+          "absmax": 0.5908005833625793,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -1.5886880914040376
+        },
+        "transformer.6.self_attn.v_proj.weight": {
+          "absmax": 1.132084846496582,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -180.51423314207227
+        },
+        "transformer.7.ffn.w1.weight": {
+          "absmax": 1.6551710367202759,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -1889.9946439555442
+        },
+        "transformer.7.ffn.w2.weight": {
+          "absmax": 5.634176254272461,
+          "n": 524288,
+          "shape": [
+            512,
+            1024
+          ],
+          "sum": 45.957964269808656
+        },
+        "transformer.7.ffn.w3.weight": {
+          "absmax": 2.0151360034942627,
+          "n": 524288,
+          "shape": [
+            1024,
+            512
+          ],
+          "sum": -68.33367132401668
+        },
+        "transformer.7.norm1.weight": {
+          "absmax": 0.648658037185669,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 217.70882986858487
+        },
+        "transformer.7.norm2.weight": {
+          "absmax": 0.8218870759010315,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 256.31079399585724
+        },
+        "transformer.7.self_attn.k_proj.bias": {
+          "absmax": 2.7125093936920166,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 11.665540198620874
+        },
+        "transformer.7.self_attn.k_proj.weight": {
+          "absmax": 1.2323108911514282,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -70.35430520163155
+        },
+        "transformer.7.self_attn.out_proj.bias": {
+          "absmax": 0.6730855107307434,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -1.574907277659804
+        },
+        "transformer.7.self_attn.out_proj.weight": {
+          "absmax": 2.1519548892974854,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": 64.20578381852133
+        },
+        "transformer.7.self_attn.q_proj.bias": {
+          "absmax": 0.8543542623519897,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": -2.0730925342068076
+        },
+        "transformer.7.self_attn.q_proj.weight": {
+          "absmax": 1.3190428018569946,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -19.367176134796182
+        },
+        "transformer.7.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "transformer.7.self_attn.v_proj.bias": {
+          "absmax": 0.4897140562534332,
+          "n": 512,
+          "shape": [
+            512
+          ],
+          "sum": 1.8363194632111117
+        },
+        "transformer.7.self_attn.v_proj.weight": {
+          "absmax": 1.3593758344650269,
+          "n": 262144,
+          "shape": [
+            512,
+            512
+          ],
+          "sum": -6.529471771099878
+        }
       }
     },
     "tokenizer": {
@@ -149,6 +5263,823 @@
         "bytes": 15842368,
         "filename": "model.safetensors",
         "sha256": "59d85f6af76a2c3b8240ea06cb21db4213b4eeca053f246b23e29cf832fc6bee"
+      },
+      "tensors": {
+        "decoder.0.ffn.w1.weight": {
+          "absmax": 2.889665365219116,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 547.2951781253569
+        },
+        "decoder.0.ffn.w2.weight": {
+          "absmax": 4.58046817779541,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -66.54021481287424
+        },
+        "decoder.0.ffn.w3.weight": {
+          "absmax": 1.9024595022201538,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -54.90372776609229
+        },
+        "decoder.0.norm1.weight": {
+          "absmax": 0.2637086510658264,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 5.721785574962269
+        },
+        "decoder.0.norm2.weight": {
+          "absmax": 0.5201863050460815,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 26.824826721363934
+        },
+        "decoder.0.self_attn.k_proj.bias": {
+          "absmax": 9.186097145080566,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 25.68068161146948
+        },
+        "decoder.0.self_attn.k_proj.weight": {
+          "absmax": 3.1317193508148193,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -55.952043373348715
+        },
+        "decoder.0.self_attn.out_proj.bias": {
+          "absmax": 0.7429463267326355,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -3.2262865589652847
+        },
+        "decoder.0.self_attn.out_proj.weight": {
+          "absmax": 4.3510050773620605,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -66.28849366806162
+        },
+        "decoder.0.self_attn.q_proj.bias": {
+          "absmax": 2.192908763885498,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -8.59917438426055
+        },
+        "decoder.0.self_attn.q_proj.weight": {
+          "absmax": 3.106748104095459,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 201.39424026420238
+        },
+        "decoder.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.0.self_attn.v_proj.bias": {
+          "absmax": 0.06669573485851288,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.16217344776396203
+        },
+        "decoder.0.self_attn.v_proj.weight": {
+          "absmax": 1.1657609939575195,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 24.382396487188146
+        },
+        "decoder.1.ffn.w1.weight": {
+          "absmax": 2.5734477043151855,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -68.21093313455049
+        },
+        "decoder.1.ffn.w2.weight": {
+          "absmax": 3.7115280628204346,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 167.28349068909029
+        },
+        "decoder.1.ffn.w3.weight": {
+          "absmax": 1.8948771953582764,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -46.87764489108474
+        },
+        "decoder.1.norm1.weight": {
+          "absmax": 0.4150628447532654,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 23.76090588553052
+        },
+        "decoder.1.norm2.weight": {
+          "absmax": 0.7563091516494751,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 39.39792509446852
+        },
+        "decoder.1.self_attn.k_proj.bias": {
+          "absmax": 4.367246627807617,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 22.803544661437627
+        },
+        "decoder.1.self_attn.k_proj.weight": {
+          "absmax": 4.438387870788574,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -144.2363634406156
+        },
+        "decoder.1.self_attn.out_proj.bias": {
+          "absmax": 0.40811634063720703,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.4434932356889476
+        },
+        "decoder.1.self_attn.out_proj.weight": {
+          "absmax": 1.9387761354446411,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 13.844056652788368
+        },
+        "decoder.1.self_attn.q_proj.bias": {
+          "absmax": 2.052366018295288,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.8834206135943532
+        },
+        "decoder.1.self_attn.q_proj.weight": {
+          "absmax": 3.3051393032073975,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 25.193887161854036
+        },
+        "decoder.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.1.self_attn.v_proj.bias": {
+          "absmax": 0.06938671320676804,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.18544696554818074
+        },
+        "decoder.1.self_attn.v_proj.weight": {
+          "absmax": 1.3420673608779907,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 103.18635827045773
+        },
+        "decoder.2.ffn.w1.weight": {
+          "absmax": 3.6710920333862305,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 1999.6486178283258
+        },
+        "decoder.2.ffn.w2.weight": {
+          "absmax": 6.404257774353027,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -89.73570930853339
+        },
+        "decoder.2.ffn.w3.weight": {
+          "absmax": 3.0427043437957764,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -207.09314555395076
+        },
+        "decoder.2.norm1.weight": {
+          "absmax": 0.7498147487640381,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 29.856145210273098
+        },
+        "decoder.2.norm2.weight": {
+          "absmax": 0.7322385311126709,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 42.00882710888982
+        },
+        "decoder.2.self_attn.k_proj.bias": {
+          "absmax": 3.766314744949341,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 12.412702339701355
+        },
+        "decoder.2.self_attn.k_proj.weight": {
+          "absmax": 4.070352077484131,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -222.93828298848985
+        },
+        "decoder.2.self_attn.out_proj.bias": {
+          "absmax": 0.649346113204956,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -1.4072150017555032
+        },
+        "decoder.2.self_attn.out_proj.weight": {
+          "absmax": 1.1819463968276978,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 55.36824327164277
+        },
+        "decoder.2.self_attn.q_proj.bias": {
+          "absmax": 1.2056909799575806,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 7.650344642956043
+        },
+        "decoder.2.self_attn.q_proj.weight": {
+          "absmax": 2.803328514099121,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 68.36931084887328
+        },
+        "decoder.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "decoder.2.self_attn.v_proj.bias": {
+          "absmax": 0.08097528666257858,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 0.06930805030970077
+        },
+        "decoder.2.self_attn.v_proj.weight": {
+          "absmax": 1.352112889289856,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 26.499409117365303
+        },
+        "embed.bias": {
+          "absmax": 4.374454498291016,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -18.536576007361873
+        },
+        "embed.weight": {
+          "absmax": 1.247774362564087,
+          "n": 1536,
+          "shape": [
+            256,
+            6
+          ],
+          "sum": -19.631584481539903
+        },
+        "encoder.0.ffn.w1.weight": {
+          "absmax": 3.9493539333343506,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 461.74714524302254
+        },
+        "encoder.0.ffn.w2.weight": {
+          "absmax": 2.077892780303955,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 50.04218079901534
+        },
+        "encoder.0.ffn.w3.weight": {
+          "absmax": 3.3850576877593994,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -23.374143055026252
+        },
+        "encoder.0.norm1.weight": {
+          "absmax": 0.28970059752464294,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 5.880692695536709
+        },
+        "encoder.0.norm2.weight": {
+          "absmax": 2.066648244857788,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 133.7769868458563
+        },
+        "encoder.0.self_attn.k_proj.bias": {
+          "absmax": 5.460906028747559,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 15.688670492512756
+        },
+        "encoder.0.self_attn.k_proj.weight": {
+          "absmax": 2.7277138233184814,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -56.16259969397839
+        },
+        "encoder.0.self_attn.out_proj.bias": {
+          "absmax": 0.9584341049194336,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.4096668777056038
+        },
+        "encoder.0.self_attn.out_proj.weight": {
+          "absmax": 2.4167377948760986,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -38.9971384589621
+        },
+        "encoder.0.self_attn.q_proj.bias": {
+          "absmax": 2.9467577934265137,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 7.113009363005403
+        },
+        "encoder.0.self_attn.q_proj.weight": {
+          "absmax": 4.088351726531982,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -61.62004929285345
+        },
+        "encoder.0.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.0.self_attn.v_proj.bias": {
+          "absmax": 0.20259030163288116,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.32684036794671556
+        },
+        "encoder.0.self_attn.v_proj.weight": {
+          "absmax": 1.2500616312026978,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 23.2877622349082
+        },
+        "encoder.1.ffn.w1.weight": {
+          "absmax": 3.404517412185669,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -237.95759814156526
+        },
+        "encoder.1.ffn.w2.weight": {
+          "absmax": 2.541635751724243,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": -52.13650788206047
+        },
+        "encoder.1.ffn.w3.weight": {
+          "absmax": 3.193768262863159,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 38.977706310342
+        },
+        "encoder.1.norm1.weight": {
+          "absmax": 2.146890640258789,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 216.8458947869949
+        },
+        "encoder.1.norm2.weight": {
+          "absmax": 2.1243176460266113,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 193.0122531838715
+        },
+        "encoder.1.self_attn.k_proj.bias": {
+          "absmax": 9.4241361618042,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -5.908856625901535
+        },
+        "encoder.1.self_attn.k_proj.weight": {
+          "absmax": 2.0765295028686523,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 27.932980552826905
+        },
+        "encoder.1.self_attn.out_proj.bias": {
+          "absmax": 0.8587518334388733,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -0.8234830845030956
+        },
+        "encoder.1.self_attn.out_proj.weight": {
+          "absmax": 1.8447808027267456,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 167.26816932027577
+        },
+        "encoder.1.self_attn.q_proj.bias": {
+          "absmax": 2.2812087535858154,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -4.6926577696576715
+        },
+        "encoder.1.self_attn.q_proj.weight": {
+          "absmax": 2.2961909770965576,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -76.41875334816916
+        },
+        "encoder.1.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.1.self_attn.v_proj.bias": {
+          "absmax": 0.5285323262214661,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 3.1858688968932256
+        },
+        "encoder.1.self_attn.v_proj.weight": {
+          "absmax": 1.942638635635376,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -112.82771559721596
+        },
+        "encoder.2.ffn.w1.weight": {
+          "absmax": 3.316760301589966,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": -79.55229992270597
+        },
+        "encoder.2.ffn.w2.weight": {
+          "absmax": 4.123638153076172,
+          "n": 131072,
+          "shape": [
+            256,
+            512
+          ],
+          "sum": 325.1464237884238
+        },
+        "encoder.2.ffn.w3.weight": {
+          "absmax": 2.9676928520202637,
+          "n": 131072,
+          "shape": [
+            512,
+            256
+          ],
+          "sum": 62.416809899495775
+        },
+        "encoder.2.norm1.weight": {
+          "absmax": 1.7742692232131958,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 188.28113016835414
+        },
+        "encoder.2.norm2.weight": {
+          "absmax": 2.7251479625701904,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 295.88386174477637
+        },
+        "encoder.2.self_attn.k_proj.bias": {
+          "absmax": 6.652103424072266,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 13.742034743539989
+        },
+        "encoder.2.self_attn.k_proj.weight": {
+          "absmax": 2.0886428356170654,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 87.48309631204575
+        },
+        "encoder.2.self_attn.out_proj.bias": {
+          "absmax": 0.9513014554977417,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -2.9930583760142326
+        },
+        "encoder.2.self_attn.out_proj.weight": {
+          "absmax": 2.726696252822876,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -47.49174747136243
+        },
+        "encoder.2.self_attn.q_proj.bias": {
+          "absmax": 1.1176583766937256,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -2.3902789727435447
+        },
+        "encoder.2.self_attn.q_proj.weight": {
+          "absmax": 2.37272310256958,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": -77.6967859781198
+        },
+        "encoder.2.self_attn.rotary.inv_freq": {
+          "absmax": 1.0,
+          "n": 32,
+          "shape": [
+            32
+          ],
+          "sum": 3.997908228135202
+        },
+        "encoder.2.self_attn.v_proj.bias": {
+          "absmax": 0.4717331826686859,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 1.2391323582269251
+        },
+        "encoder.2.self_attn.v_proj.weight": {
+          "absmax": 2.283879041671753,
+          "n": 65536,
+          "shape": [
+            256,
+            256
+          ],
+          "sum": 69.83627776926642
+        },
+        "head.bias": {
+          "absmax": 0.11957437545061111,
+          "n": 6,
+          "shape": [
+            6
+          ],
+          "sum": -0.24898055638186634
+        },
+        "head.weight": {
+          "absmax": 0.36060261726379395,
+          "n": 1536,
+          "shape": [
+            6,
+            256
+          ],
+          "sum": 1.1359781390503372
+        },
+        "post_quant_embed.bias": {
+          "absmax": 1.8173414468765259,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": -7.853123470209539
+        },
+        "post_quant_embed.weight": {
+          "absmax": 2.648430585861206,
+          "n": 5120,
+          "shape": [
+            256,
+            20
+          ],
+          "sum": 6.947298561950447
+        },
+        "post_quant_embed_pre.bias": {
+          "absmax": 1.8645217418670654,
+          "n": 256,
+          "shape": [
+            256
+          ],
+          "sum": 4.14772074080247
+        },
+        "post_quant_embed_pre.weight": {
+          "absmax": 2.3600869178771973,
+          "n": 2560,
+          "shape": [
+            256,
+            10
+          ],
+          "sum": 37.42674553082179
+        },
+        "quant_embed.bias": {
+          "absmax": 0.4507751762866974,
+          "n": 20,
+          "shape": [
+            20
+          ],
+          "sum": 0.17131538037210703
+        },
+        "quant_embed.weight": {
+          "absmax": 1.8068323135375977,
+          "n": 5120,
+          "shape": [
+            20,
+            256
+          ],
+          "sum": 38.59947675254807
+        },
+        "tokenizer.bsq.basis": {
+          "absmax": 524288.0,
+          "n": 20,
+          "shape": [
+            20
+          ],
+          "sum": 1048575.0
+        },
+        "tokenizer.bsq.group_basis": {
+          "absmax": 8.0,
+          "n": 4,
+          "shape": [
+            4
+          ],
+          "sum": 15.0
+        }
       }
     }
   }

@@ -1,0 +1,14 @@
+[package]
+name = "kronos-cli"
+description = "CLI for the Rust Kronos port"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kronos-core = { path = "../kronos-core" }
+candle-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

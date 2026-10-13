@@ -1,0 +1,18 @@
+[package]
+name = "kronos-core"
+description = "Rust port of the Kronos financial K-line foundation model (inference)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+candle-core.workspace = true
+candle-nn.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+half.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
