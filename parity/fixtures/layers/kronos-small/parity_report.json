@@ -1,0 +1,73 @@
+[
+  {
+    "name": "context_last",
+    "shape": [
+      1,
+      512
+    ],
+    "max_abs": 4.470348358154297e-7,
+    "max_rel": 2.1734672621928326e-7,
+    "pass": true
+  },
+  {
+    "name": "pre_argmax",
+    "shape": [
+      1,
+      1
+    ],
+    "max_abs": 0.0,
+    "max_rel": 0.0,
+    "pass": true
+  },
+  {
+    "name": "s1_logits_last",
+    "shape": [
+      1,
+      1024
+    ],
+    "max_abs": 0.00001239776611328125,
+    "max_rel": 7.347185604037561e-7,
+    "pass": true
+  },
+  {
+    "name": "s2_logits_last",
+    "shape": [
+      1,
+      1024
+    ],
+    "max_abs": 8.58306884765625e-6,
+    "max_rel": 6.035901137572874e-7,
+    "pass": true
+  },
+  {
+    "name": "token_s1",
+    "shape": [
+      1,
+      512
+    ],
+    "max_abs": 0.0,
+    "max_rel": 0.0,
+    "pass": true
+  },
+  {
+    "name": "token_s2",
+    "shape": [
+      1,
+      512
+    ],
+    "max_abs": 0.0,
+    "max_rel": 0.0,
+    "pass": true
+  },
+  {
+    "name": "tokenizer_recon",
+    "shape": [
+      1,
+      512,
+      6
+    ],
+    "max_abs": 4.291534423828125e-6,
+    "max_rel": 8.61490842448066e-7,
+    "pass": true
+  }
+]

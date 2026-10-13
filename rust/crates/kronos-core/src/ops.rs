@@ -12,6 +12,40 @@ fn last_dim(t: &Tensor) -> Vec<usize> {
     vec![t.dims().len() - 1]
 }
 
+/// Embedding lookup that accepts rank-2 index tensors.
+///
+/// Candle's `Tensor::embedding` only takes rank-1 ids. Kronos ids are `[B, T]`,
+/// so we flatten, look up, and reshape back. This is called on every forward
+/// pass so it is kept minimal.
+#[inline]
+pub fn embedding_lookup(weight: &Tensor, ids: &Tensor) -> Result<Tensor> {
+    let dims = ids.dims().to_vec();
+    let flat = ids.flatten_all()?;
+    let out = weight.embedding(&flat)?;
+    let mut shape = dims.clone();
+    shape.push(weight.dim(1)?);
+    out.reshape(&shape[..])
+}
+
+/// Linear projection: `[B, L, in] x [out, in]^T + bias -> [B, L, out]`.
+///
+/// Candle's `matmul` requires equal rank on both sides, so we flatten the
+/// leading two dims, do the 2-D product, and restore. This is the single most
+/// frequently called operation in the model.
+#[inline]
+pub fn linear(x: &Tensor, w: &Tensor, bias: Option<&Tensor>) -> Result<Tensor> {
+    let dims = x.dims().to_vec();
+    let (b, l, din) = (dims[0], dims[1], dims[2]);
+    let dout = w.dim(0)?;
+    let x2 = x.reshape((b * l, din))?;
+    let y2 = x2.matmul(&w.t()?)?;
+    let y = y2.reshape((b, l, dout))?;
+    match bias {
+        Some(bias) => y.broadcast_add(bias),
+        None => Ok(y),
+    }
+}
+
 /// `RMSNorm` — `model/module.py:257-268`.
 ///
 /// `x * rsqrt(mean(x*x, -1, keepdim) + eps) * weight`, eps = 1e-5.
@@ -21,11 +55,11 @@ fn last_dim(t: &Tensor) -> Vec<usize> {
 pub fn rms_norm(x: &Tensor, weight: &Tensor, eps: f32) -> Result<Tensor> {
     let x32 = x.to_dtype(DType::F32)?;
     let ms = x32.sqr()?.mean_keepdim(last_dim(&x32))?;
-    // rsqrt(v) as 1/sqrt(v): torch.rsqrt is a hardware intrinsic whose result
-    // may differ by 1 ulp from 1/sqrt, which is far below our parity budget.
-    let rsqrt = ms.sqrt()?.recip()?;
-    let normed = rsqrt.affine(1.0f64, eps as f64)?;
-    x32.broadcast_mul(&normed)?
+    // upstream: x * rsqrt(mean(x^2) + eps) * weight
+    // the eps goes INSIDE the sqrt: rsqrt(ms + eps), not rsqrt(ms) + eps.
+    // Without this, a near-zero ms would produce a huge rsqrt and blow up.
+    let denom = ms.affine(1.0f64, eps as f64)?.sqrt()?.recip()?;
+    x32.broadcast_mul(&denom)?
         .to_dtype(x.dtype())?
         .broadcast_mul(weight)
 }
@@ -45,6 +79,7 @@ pub fn rms_norm(x: &Tensor, weight: &Tensor, eps: f32) -> Result<Tensor> {
 /// Getting the half-split backwards is the easiest way to build a model that
 /// loads cleanly and forecasts garbage. Upstream caches cos/sin keyed on
 /// sequence length (module.py:294); we build the table once for `max_len`.
+#[derive(Clone)]
 pub struct RotaryCache {
     cos: Tensor,
     sin: Tensor,
@@ -111,15 +146,56 @@ fn rotate_half_apply(x: &Tensor, cos: &Tensor, sin: &Tensor) -> Result<Tensor> {
 
 /// `F.scaled_dot_product_attention` — `model/module.py:345` (self) / `:389` (cross).
 ///
-/// Scale is PyTorch's default `1/sqrt(head_dim)`; `softcapping = 0` disables
-/// softcap. `causal` is upstream's `is_causal`.
+/// Candle's `sdpa` custom op requires cuDNN on CUDA, which is not installed
+/// here. We implement the attention manually using standard tensor ops, which
+/// is mathematically identical (up to float ordering) and portable.
 ///
-/// Upstream always passes `dropout_p=0.0` at eval and the predictor never
-/// supplies a `key_padding_mask` (`auto_regressive_inference` omits it), so
-/// there is no mask path to reproduce.
+/// Shapes: `q`, `k`, `v` are `[B, H, L, hd]`. `causal` applies a lower-triangular
+/// mask so position `i` can only attend to positions `0..=i`.
 pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, causal: bool) -> Result<Tensor> {
-    let hd = q.dim(3)? as f32;
-    candle_nn::ops::sdpa(q, k, v, None, causal, 1.0 / hd.sqrt(), 0.0)
+    let hd = q.dim(3)? as f64;
+    let scale = (1.0 / hd.sqrt()) as f32;
+    let (b, h, lq, _) = q.dims4()?;
+    let lk = k.dim(2)?;
+
+    // scores = (Q * K^T) * scale
+    let kt = k.transpose(2, 3)?.contiguous()?; // [B, H, hd, Lk]
+    let mut scores = q.matmul(&kt)?; // [B, H, Lq, Lk]
+    if scale != 1.0 {
+        scores = scores.affine(scale as f64, 0.0)?;
+    }
+
+    if causal {
+        // mask[i][j] = -inf when j > i (cannot attend to the future)
+        let mask = Tensor::from_vec(
+            (0..lq * lk)
+                .map(|idx| {
+                    let i = idx / lk;
+                    let j = idx % lk;
+                    if j > i {
+                        f64::NEG_INFINITY
+                    } else {
+                        0.0
+                    }
+                })
+                .collect::<Vec<_>>(),
+            (lq, lk),
+            q.device(),
+        )?
+        .to_dtype(DType::F32)?
+        .broadcast_as((b, h, lq, lk))?;
+        scores = scores.broadcast_add(&mask)?;
+    }
+
+    // softmax over the last axis, then multiply by V
+    // (manual because candle's softmax_last_dim also requires cuDNN on CUDA)
+    let last = scores.dims().len() - 1;
+    let max = scores.max_keepdim(last)?;
+    let shifted = scores.broadcast_sub(&max)?;
+    let exp = shifted.exp()?;
+    let sum = exp.sum_keepdim(last)?;
+    let probs = exp.broadcast_div(&sum)?;
+    probs.matmul(&v.contiguous()?)
 }
 
 /// `F.normalize(z, dim=-1)` — `model/module.py:246`.
@@ -181,22 +257,22 @@ pub fn indices_to_bits(
     //
     // NOTE: using `index * 2^i mod 2` instead would be wrong: it yields the low
     // bit of `index` for every position, i.e. a broadcast, not a bit field.
+    // Bit i of the index is (index >> i) & 1. We have no integer shift in
+    // candle 0.11, so: q = floor(index / 2^i), then take q's low bit with
+    // q - 2*floor(q/2). BOTH floors are required, and the masks must be
+    // POSITIVE powers of two -- dividing by 2^-i would multiply by 2^i and
+    // broadcast the low bit of `index` to every position instead.
     let masks = Tensor::from_vec(
-        (0..half)
-            .map(|i| (2.0f64).powi(-(i as i32)))
-            .collect::<Vec<_>>(),
+        (0..half).map(|i| (1u64 << i) as f64).collect::<Vec<_>>(),
         half,
         device,
     )?;
-    let zero = Tensor::from_vec(vec![0.0f64], (), device)?;
     let two = Tensor::from_vec(vec![2.0f64], (), device)?;
     let expand = |idx: &Tensor| -> Result<Tensor> {
         let unsq = idx.unsqueeze(idx.dims().len())?.to_dtype(DType::F64)?;
-        let q = (unsq.broadcast_mul(&masks)?).floor()?;
+        let q = unsq.broadcast_div(&masks)?.floor()?;
         let bit = q.broadcast_sub(&q.broadcast_div(&two)?.floor()?.broadcast_mul(&two)?)?;
-        bit.broadcast_ne(&zero)?
-            .to_dtype(DType::F32)?
-            .affine(2.0, -1.0)
+        bit.to_dtype(DType::F32)?.affine(2.0, -1.0)
     };
     let b1 = expand(s1)?;
     let b2 = expand(s2)?;

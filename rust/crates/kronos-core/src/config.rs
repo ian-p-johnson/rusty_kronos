@@ -39,6 +39,45 @@ pub enum ConfigError {
     UnknownField { field: String },
 }
 
+/// The geometry a `TransformerBlock` needs.
+///
+/// Both the predictor and the tokenizer own transformer blocks, but with
+/// *different* dimensions: Kronos-small uses 512/8/1024 while the tokenizer
+/// uses 256/4/512. `TransformerBlock` is therefore parameterised on this struct
+/// rather than on either config, so neither can accidentally borrow the other's
+/// head count or embedding width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockGeometry {
+    pub d_model: usize,
+    pub n_heads: usize,
+    pub ff_dim: usize,
+    pub head_dim: usize,
+    /// Context length the RoPE cache must cover.
+    pub max_len: usize,
+}
+
+impl BlockGeometry {
+    pub fn new(d_model: usize, n_heads: usize, ff_dim: usize, max_len: usize) -> Self {
+        assert!(
+            d_model.is_multiple_of(n_heads),
+            "d_model must be divisible by n_heads"
+        );
+        Self {
+            d_model,
+            n_heads,
+            ff_dim,
+            head_dim: d_model / n_heads,
+            max_len,
+        }
+    }
+    pub fn for_predictor(c: &PredictorConfig, max_len: usize) -> Self {
+        Self::new(c.d_model, c.n_heads, c.ff_dim, max_len)
+    }
+    pub fn for_tokenizer(c: &TokenizerConfig, max_len: usize) -> Self {
+        Self::new(c.d_model, c.n_heads, c.ff_dim, max_len)
+    }
+}
+
 macro_rules! require_positive {
     ($field:ident, $val:expr) => {
         if ($val as i64) <= 0 {
@@ -166,7 +205,7 @@ impl TokenizerConfig {
         if self.group_size == 0 {
             return Err(ConfigError::ZeroGroupSize);
         }
-        // BinarySphericalQuantizer asserts embed_dim % group_size == 0 (module.py:58)
+        // BinarySphericalQuantizer asserts embed_dim group_size.is_multiple_of(0) (module.py:58)
         if !self.codebook_dim().is_multiple_of(self.group_size) {
             return Err(ConfigError::GroupSizeNotDivisible {
                 codebook_dim: self.codebook_dim(),

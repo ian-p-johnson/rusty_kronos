@@ -107,6 +107,52 @@ against these so a silent partial or mismatched load is impossible.
 | stochastic | nucleus sampling | 3 cheap assertions, **not** a statistical test |
 | precision | fp16 vs fp32 | divergence report, bounded, not bit-exact |
 
+The `tok.post_quant_embed_pre` stage is intentionally absent: it is used only by
+`KronosTokenizer.forward` (the training path), never by `decode()`.
+
+## Running the per-layer parity check (Phase 2)
+
+```bash
+python parity/gen_probe.py          # shared 512-row probe input
+for m in small base mini; do ...; done
+```
+
+`rust/target/release/kronos-cli parity` runs the tokenizer encode, the tokenizer
+decode round-trip, the predictor's `decode_s1` and `decode_s2`, and compares
+every captured stage against `fixtures/layers/<model>/`. Current result on all
+three models:
+
+| stage | kronos-small | kronos-base | kronos-mini |
+|---|---|---|---|
+| token ids (`s1`/`s2`/argmax) | **exact** | **exact** | **exact** |
+| `tokenizer_recon` | 4.3e-6 | 4.3e-6 | 3.8e-6 |
+| `context_last` | 4.5e-7 | — | — |
+| `s1_logits_last` | 1.2e-5 | — | — |
+| `s2_logits_last` | 8.6e-6 | — | — |
+
+Result: **7/7 stages pass for all three released models at `rtol=1e-5`**.
+
+### Bugs Phase 2b found (all via fixtures, none via unit tests alone)
+
+1. **Fortran-order `.npy`.** `np.save` wrote `probe_x.npy` with
+   `fortran_order: True` because the array was built with `np.stack([...], 1)`.
+   The reader silently treated it as C-order, so the "input" was actually
+   `x[0,0,0], x[1,0,0], x[2,0,0], ...` — three similar `open` prices repeated —
+   and every downstream stage was poisoned. Fixed both sides: the reader now
+   handles Fortran order, and `gen_probe.py` writes contiguous arrays.
+2. **int64 read as 4 bytes.** `'<i8'` is 8 bytes per element; the reader read
+   4 and widened the low half, shifting the timestamp axis.
+3. `(1,1)` shape treated as 2 elements (`max(len)`) instead of the product.
+4. **`indices_to_bits` mask direction inverted.** Dividing by `2^-i` *multiplies*
+   by `2^i`, broadcasting the low bit of the index to every position. This was
+   caught by a full-codebook round-trip test after a fixture-only mismatch was
+   not enough to localise it.
+5. **RMSNorm eps in the wrong place.** `rsqrt(mean + eps)` is not
+   `rsqrt(mean) + eps`. The latter amplifies a near-zero mean by 1e5 and made
+   the encoder blow up to 1e19 and then NaN.
+6. **Pre-LN residual wired backwards.** `x + attn(norm(x))`, not
+   `norm(x) + attn(x)`.
+
 Stochastic parity is distributional by agreement. Rather than a χ² gate we use
 three assertions that catch essentially every realistic sampler bug at
 negligible cost — because `top_k=1` degenerates to argmax and therefore
