@@ -12,6 +12,7 @@
 //! against per-stage activations captured from it.
 
 pub mod config;
+pub mod ops;
 pub mod weights;
 
 pub use config::{ConfigError, PredictorConfig, TokenizerConfig};
