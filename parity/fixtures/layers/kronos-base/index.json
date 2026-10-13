@@ -1,0 +1,273 @@
+{
+  "model": "kronos-base",
+  "device": "cuda:0",
+  "deduped_aliases": {
+    "pred.dep_layer": "pred.dep_layer.norm",
+    "pred.embedding": "pred.embedding.fusion_proj",
+    "pred.head": "pred.head.proj_s1"
+  },
+  "tensors": {
+    "pred.dep_layer.cross_attn": [
+      1,
+      1,
+      832
+    ],
+    "pred.dep_layer.norm": [
+      1,
+      512,
+      832
+    ],
+    "pred.embedding.emb_s1": [
+      1,
+      1,
+      832
+    ],
+    "pred.embedding.emb_s2": [
+      1,
+      512,
+      832
+    ],
+    "pred.embedding.fusion_proj": [
+      1,
+      512,
+      832
+    ],
+    "pred.head.proj_s1": [
+      1,
+      512,
+      1024
+    ],
+    "pred.head.proj_s2": [
+      1,
+      512,
+      1024
+    ],
+    "pred.norm": [
+      1,
+      512,
+      832
+    ],
+    "pred.time_emb": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.ffn.w1": [
+      1,
+      512,
+      2048
+    ],
+    "pred.transformer.0.ffn.w2": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.ffn.w3": [
+      1,
+      512,
+      2048
+    ],
+    "pred.transformer.0.norm1": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.norm2": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.self_attn.k_proj": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.self_attn.out_proj": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.self_attn.q_proj": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.0.self_attn.v_proj": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.1": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.10": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.11": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.2": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.3": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.4": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.5": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.6": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.7": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.8": [
+      1,
+      512,
+      832
+    ],
+    "pred.transformer.9": [
+      1,
+      512,
+      832
+    ],
+    "tok.decoder.0": [
+      1,
+      512,
+      256
+    ],
+    "tok.decoder.1": [
+      1,
+      512,
+      256
+    ],
+    "tok.decoder.2": [
+      1,
+      512,
+      256
+    ],
+    "tok.embed": [
+      1,
+      512,
+      256
+    ],
+    "tok.encoder.0": [
+      1,
+      512,
+      256
+    ],
+    "tok.encoder.1": [
+      1,
+      512,
+      256
+    ],
+    "tok.encoder.2": [
+      1,
+      512,
+      256
+    ],
+    "tok.head": [
+      1,
+      512,
+      6
+    ],
+    "tok.post_quant_embed": [
+      1,
+      512,
+      256
+    ],
+    "tok.quant_embed": [
+      1,
+      512,
+      20
+    ],
+    "tok.tokenizer.bsq": [
+      1,
+      512,
+      20
+    ]
+  },
+  "extra": {
+    "mean": [
+      10.9370698928833,
+      10.950566291809082,
+      10.922832489013672,
+      10.936504364013672,
+      1129.08984375,
+      1234269.875
+    ],
+    "std": [
+      0.16797514259815216,
+      0.16558335721492767,
+      0.16862493753433228,
+      0.16645221412181854,
+      869.22607421875,
+      950808.5
+    ],
+    "ctx_len": 512,
+    "pred_len": 8,
+    "seed": 123,
+    "d_model": 832,
+    "n_layers": 12,
+    "n_heads": 16,
+    "ff_dim": 2048,
+    "s1_bits": 10,
+    "s2_bits": 10,
+    "learn_te": true,
+    "token_s1": [
+      1,
+      512
+    ],
+    "token_s2": [
+      1,
+      512
+    ],
+    "tokenizer_recon": [
+      1,
+      512,
+      6
+    ],
+    "s1_logits_last": [
+      1,
+      1024
+    ],
+    "context_last": [
+      1,
+      832
+    ],
+    "pre_argmax": [
+      1,
+      1
+    ],
+    "s2_logits_last": [
+      1,
+      1024
+    ]
+  }
+}

@@ -74,3 +74,13 @@ venv.bak/
 temp/
 tmp/
 .python-version
+
+# Rust / cargo
+rust/target/
+**/*.rs.bk
+# NOTE: `build/` above is inherited from the Python section and is NOT anchored;
+# cargo emits nothing into a root `build/` dir, but be aware it is gitignored.
+
+# Parity harness scratch (fixtures themselves ARE committed)
+parity/fixtures/**/scratch/
+*.npz.tmp

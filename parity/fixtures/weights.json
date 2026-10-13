@@ -1,0 +1,155 @@
+{
+  "kronos-base": {
+    "model": {
+      "config": {
+        "attn_dropout_p": 0.0,
+        "d_model": 832,
+        "ff_dim": 2048,
+        "ffn_dropout_p": 0.2,
+        "learn_te": true,
+        "n_heads": 16,
+        "n_layers": 12,
+        "resid_dropout_p": 0.2,
+        "s1_bits": 10,
+        "s2_bits": 10,
+        "token_dropout_p": 0.0
+      },
+      "repo": "NeoQuasar/Kronos-base",
+      "revision": "2b554741eca47781b64468546e77fef3e85130e6",
+      "safetensors": {
+        "bytes": 409264008,
+        "filename": "model.safetensors",
+        "sha256": "abff193acab6db1a0368e9773e75799d11403b6d054ee6d5f0a11aeabc5f4b83"
+      }
+    },
+    "tokenizer": {
+      "config": {
+        "attn_dropout_p": 0.0,
+        "beta": 0.05,
+        "d_in": 6,
+        "d_model": 256,
+        "ff_dim": 512,
+        "ffn_dropout_p": 0.0,
+        "gamma": 1.1,
+        "gamma0": 1.0,
+        "group_size": 4,
+        "n_dec_layers": 4,
+        "n_enc_layers": 4,
+        "n_heads": 4,
+        "resid_dropout_p": 0.0,
+        "s1_bits": 10,
+        "s2_bits": 10,
+        "zeta": 0.05
+      },
+      "repo": "NeoQuasar/Kronos-Tokenizer-base",
+      "revision": "0e0117387f39004a9016484a186a908917e22426",
+      "safetensors": {
+        "bytes": 15842368,
+        "filename": "model.safetensors",
+        "sha256": "59d85f6af76a2c3b8240ea06cb21db4213b4eeca053f246b23e29cf832fc6bee"
+      }
+    }
+  },
+  "kronos-mini": {
+    "model": {
+      "config": {
+        "attn_dropout_p": 0.0,
+        "d_model": 256,
+        "ff_dim": 512,
+        "ffn_dropout_p": 0.2,
+        "learn_te": true,
+        "n_heads": 4,
+        "n_layers": 4,
+        "resid_dropout_p": 0.2,
+        "s1_bits": 10,
+        "s2_bits": 10,
+        "token_dropout_p": 0.0
+      },
+      "repo": "NeoQuasar/Kronos-mini",
+      "revision": "f4e68697d9d5aed55cef5c96aabc3376bcad9f81",
+      "safetensors": {
+        "bytes": 16440776,
+        "filename": "model.safetensors",
+        "sha256": "a7d5f37e2e9fbd9891f7d7d4f72574512dd1f704fee14223e0a8cd0fbf54197c"
+      }
+    },
+    "tokenizer": {
+      "config": {
+        "attn_dropout_p": 0.0,
+        "beta": 0.05,
+        "d_in": 6,
+        "d_model": 256,
+        "ff_dim": 512,
+        "ffn_dropout_p": 0.0,
+        "gamma": 1.1,
+        "gamma0": 1.0,
+        "group_size": 5,
+        "n_dec_layers": 4,
+        "n_enc_layers": 4,
+        "n_heads": 4,
+        "resid_dropout_p": 0.0,
+        "s1_bits": 10,
+        "s2_bits": 10,
+        "zeta": 0.05
+      },
+      "repo": "NeoQuasar/Kronos-Tokenizer-2k",
+      "revision": "26966d0035065a0cae0ebad7af8ece35bc1fb51c",
+      "safetensors": {
+        "bytes": 15842376,
+        "filename": "model.safetensors",
+        "sha256": "b97ec46b3b72160509e289183eaf7bdf5f0dac5bb9b49522f6d46638a99a8717"
+      }
+    }
+  },
+  "kronos-small": {
+    "model": {
+      "config": {
+        "attn_dropout_p": 0.1,
+        "d_model": 512,
+        "ff_dim": 1024,
+        "ffn_dropout_p": 0.25,
+        "learn_te": true,
+        "n_heads": 8,
+        "n_layers": 8,
+        "resid_dropout_p": 0.25,
+        "s1_bits": 10,
+        "s2_bits": 10,
+        "token_dropout_p": 0.1
+      },
+      "repo": "NeoQuasar/Kronos-small",
+      "revision": "901c26c1332695a2a8f243eb2f37243a37bea320",
+      "safetensors": {
+        "bytes": 98980656,
+        "filename": "model.safetensors",
+        "sha256": "b082dfcbd8e8c142a725c8bbb99781802f38fec81210e13479effb32b3c3e020"
+      }
+    },
+    "tokenizer": {
+      "config": {
+        "attn_dropout_p": 0.0,
+        "beta": 0.05,
+        "d_in": 6,
+        "d_model": 256,
+        "ff_dim": 512,
+        "ffn_dropout_p": 0.0,
+        "gamma": 1.1,
+        "gamma0": 1.0,
+        "group_size": 4,
+        "n_dec_layers": 4,
+        "n_enc_layers": 4,
+        "n_heads": 4,
+        "resid_dropout_p": 0.0,
+        "s1_bits": 10,
+        "s2_bits": 10,
+        "zeta": 0.05
+      },
+      "repo": "NeoQuasar/Kronos-Tokenizer-base",
+      "revision": "0e0117387f39004a9016484a186a908917e22426",
+      "safetensors": {
+        "bytes": 15842368,
+        "filename": "model.safetensors",
+        "sha256": "59d85f6af76a2c3b8240ea06cb21db4213b4eeca053f246b23e29cf832fc6bee"
+      }
+    }
+  }
+}

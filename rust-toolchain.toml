@@ -1,0 +1,7 @@
+[toolchain]
+# Pinned deliberately. The machine default (nightly 2026-02-20) cannot build
+# current crates.io: sysinfo >= 0.39 requires `cfg_select`, stabilised after
+# that nightly. `channel = "stable"` reproduces the toolchain used to validate
+# candle-core 0.11 + CUDA in Phase 1.
+channel = "stable"
+components = ["rustfmt", "clippy"]
