@@ -118,7 +118,23 @@ fn every_released_tokenizer_loads_completely() {
         cfg.validate().expect("config valid");
         let expected = expected_tokenizer_keys(&cfg);
         let loaded = load_tokenizer_weights(&w, &cfg, DType::F32, &dev).expect("weights load");
-        assert_eq!(loaded.len(), expected.len(), "{repo}: tensor count");
+        // The two i64 BSQ basis buffers are validated by name/dtype/shape but
+        // deliberately absent from the device map (no i64 CUDA path, unused at
+        // inference); the rest must all be present.
+        let int_skipped = expected
+            .iter()
+            .filter(|n| {
+                matches!(
+                    n.as_str(),
+                    "tokenizer.bsq.basis" | "tokenizer.bsq.group_basis"
+                )
+            })
+            .count();
+        assert_eq!(
+            loaded.len(),
+            expected.len() - int_skipped,
+            "{repo}: tensor count"
+        );
         // Both tokenizers are ~3.96M; they differ by exactly 1 parameter
         // because `group_basis` is length group_size (4 vs 5).
         assert!(

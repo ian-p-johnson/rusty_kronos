@@ -11,17 +11,21 @@
 //! the oracle (`parity/check_frozen.sh`), and every stage here is checked
 //! against per-stage activations captured from it.
 
+pub mod ar;
 pub mod block;
 pub mod config;
+pub mod data;
 pub mod embed;
 pub mod npy;
 pub mod ops;
 pub mod parity;
 pub mod predictor;
+pub mod sampling;
 pub mod tokenizer;
 pub mod weights;
 
 pub use config::{BlockGeometry, ConfigError, PredictorConfig, TokenizerConfig};
+pub use data::{load_csv, DataError, Kline};
 pub use weights::{
     expected_predictor_keys, expected_tokenizer_keys, load_predictor_weights,
     load_tokenizer_weights, LoadError, Weights,

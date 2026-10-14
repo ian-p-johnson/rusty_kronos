@@ -132,6 +132,11 @@ impl TransformerBlock {
         })
     }
 
+    /// Compute dtype, taken from a weight (all block weights share it).
+    pub fn dtype_of_norm1(&self) -> DType {
+        self.norm1.dtype()
+    }
+
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
         let n1 = rms_norm(x, &self.norm1, self.eps)?;
         let h = x.broadcast_add(&self.attn.forward(&n1)?)?;

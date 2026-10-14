@@ -96,4 +96,11 @@ impl Kronos {
     pub fn config(&self) -> &PredictorConfig {
         &self.cfg
     }
+
+    pub fn dtype(&self) -> DType {
+        self.transformer
+            .first()
+            .map(|blk| blk.dtype_of_norm1())
+            .unwrap_or(DType::F32)
+    }
 }

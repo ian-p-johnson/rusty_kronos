@@ -173,6 +173,11 @@ impl KronosTokenizer {
         crate::ops::linear(&z, &self.head_w, Some(&self.head_b))
     }
 
+    /// The compute dtype the weights were loaded in.
+    pub fn dtype(&self) -> DType {
+        self.dtype
+    }
+
     /// `q_scale = 1/sqrt(codebook_dim)`, exposed for the parity harness.
     pub fn q_scale(&self) -> f64 {
         self.cfg.q_scale() as f64

@@ -294,6 +294,13 @@ impl Weights {
         let raw = read_cpuside(path)?;
         let mut tensors = BTreeMap::new();
         for name in expected {
+            if raw[name].dtype() == DType::I64 {
+                // The two BSQ basis buffers are the only int tensors, and they
+                // fill the training-side loss only. Inference never reads them
+                // (`group_codebook` is rebuilt from config), and candle has no
+                // i64 CUDA path, so leave them out of the device map.
+                continue;
+            }
             let t = raw[name].to_device(dev).and_then(|t| t.to_dtype(dtype));
             tensors.insert(
                 name.clone(),

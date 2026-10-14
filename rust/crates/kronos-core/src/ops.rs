@@ -182,7 +182,7 @@ pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, causal: bool) -> Result<Tensor> 
             (lq, lk),
             q.device(),
         )?
-        .to_dtype(DType::F32)?
+        .to_dtype(q.dtype())? // match the scores dtype (f32 or f16)
         .broadcast_as((b, h, lq, lk))?;
         scores = scores.broadcast_add(&mask)?;
     }
@@ -203,8 +203,19 @@ pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, causal: bool) -> Result<Tensor> 
 /// Unlike `rms_norm` there is no learned scale and the default eps (1e-12)
 /// only guards division by zero.
 pub fn l2_normalize(z: &Tensor) -> Result<Tensor> {
-    let sums = z.sqr()?.sum_keepdim(last_dim(z))?;
-    z.broadcast_div(&sums.sqrt()?)
+    // Sums of squares MUST be accumulated in f32 regardless of compute dtype.
+    // The tokenizer's encoder emits activations of order 1e4 (larger than
+    // f32's 65504 limit for f16 squares: 1e4^2 = 1e8 -> inf -> every value
+    // normalises to 0 -> sign(0) = -1 -> every subtoken collapses to id 0
+    // (measured: 100% token flips before this fix).
+    let sums = z
+        .to_dtype(DType::F32)?
+        .sqr()?
+        .sum_keepdim(last_dim(z))?
+        .sqrt()?;
+    z.to_dtype(DType::F32)?
+        .broadcast_div(&sums)?
+        .to_dtype(z.dtype())
 }
 
 /// BSQ sign step — `BinarySphericalQuantizer.quantize`, `model/module.py:82-88`.
