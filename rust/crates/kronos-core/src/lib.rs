@@ -16,6 +16,7 @@ pub mod block;
 pub mod config;
 pub mod data;
 pub mod embed;
+pub mod flash;
 pub mod npy;
 pub mod ops;
 pub mod parity;

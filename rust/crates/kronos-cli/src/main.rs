@@ -823,7 +823,7 @@ fn cmd_microbench(args: &[String]) -> Result<()> {
     let k = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
     let v = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
     let fused = || -> anyhow::Result<Tensor> {
-        kronos_core::ops::fused_sdpa(&q, &k, &v).map_err(anyhow::Error::from)
+        kronos_core::flash::fused(&q, &k, &v, true).map_err(anyhow::Error::from)
     };
     match fused() {
         Ok(_) => {
@@ -833,11 +833,11 @@ fn cmd_microbench(args: &[String]) -> Result<()> {
             }
             q.device().synchronize()?;
             println!(
-                "sdpa(cuDNN fused): {:.3} ms/call",
+                "sdpa(fused kernel): {:.3} ms/call",
                 t.elapsed().as_secs_f64() / 50.0 * 1e3
             );
         }
-        Err(e) => println!("sdpa(cuDNN fused) FAILED: {e}"),
+        Err(e) => println!("sdpa(fused kernel) FAILED: {e}"),
     }
     let manual = |q: &Tensor| -> anyhow::Result<f64> {
         let t = std::time::Instant::now();
