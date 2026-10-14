@@ -325,10 +325,13 @@ fn sampler_audit() {
         top_p: 0.9,
     };
     let draws = 512usize;
-    let mut rng = sampling::Rng::new(123);
+    let tab = sampling::Rng::new(123)
+        .uniform_table(draws, 1, &dev)
+        .unwrap();
     let mut ids: Vec<u32> = Vec::with_capacity(draws);
-    for _ in 0..draws {
-        let id = sampling::sample(&logits, &cfg, &mut rng).unwrap();
+    for i in 0..draws {
+        let d = tab.narrow(0, i, 1).unwrap().squeeze(0).unwrap();
+        let id = sampling::sample(&logits, &cfg, &d).unwrap();
         ids.push(
             id.to_device(&Device::Cpu)
                 .unwrap()

@@ -130,11 +130,32 @@ pub fn generate(
     let x_stamp = repeat_series(&input.x_stamp, p.sample_count)?.to_dtype(dt)?;
     let y_stamp = repeat_series(&input.y_stamp, p.sample_count)?.to_dtype(dt)?;
 
+    let profile = std::env::var("KRONOS_PROFILE").is_ok();
+    let t0 = std::time::Instant::now();
     let x_tokens = tok.encode(&x)?; // (s1, s2) ids [B, T]
+    if profile {
+        eprintln!(
+            "[profile] encode {:.1} ms",
+            t0.elapsed().as_secs_f64() * 1e3
+        );
+    }
+    // Pre-draw every uniform for the whole trajectory and upload ONCE: the
+    // Phase-4 sampler read them off the host per step (one sync each). The
+    // row order matches the loop's batch order, step-major.
+    let batch = x_tokens.0.dim(0)?;
+    let dev = x.device();
+    let draws_tab = if p.cfg.top_k == 1 {
+        Tensor::zeros((p.pred_len, batch), candle_core::DType::F32, dev)?
+    } else {
+        rng.uniform_table(p.pred_len, batch, dev)?.to_device(dev)?
+    };
     let initial = x.dim(1)?;
     let batch = x_tokens.0.dim(0)?;
+    let _dev = x.device();
     let total = initial + p.pred_len;
     let full_stamp = Tensor::cat(&[&x_stamp, &y_stamp], 1)?.contiguous()?;
+    let t_loop = std::time::Instant::now();
+    let (mut t_samp, mut t_rest_total) = (0.0f64, 0.0f64);
 
     // Ring buffer: the initial window holds only the LAST min(T, max_ctx) tokens.
     let buffer_len = initial.min(p.max_context);
@@ -151,7 +172,9 @@ pub fn generate(
         let cs = current.saturating_sub(p.max_context);
         let stamp = full_stamp.narrow(1, cs, window_len)?;
 
+        let ts = std::time::Instant::now();
         let d1 = model.decode_s1(&s1, &s2, &stamp)?;
+        t_rest_total += ts.elapsed().as_secs_f64();
         let s1_last = d1.s1_logits.narrow(1, window_len - 1, 1)?.squeeze(1)?;
         let trace = std::env::var("KRONOS_TRACE_TOKENS").is_ok();
         if trace {
@@ -162,9 +185,14 @@ pub fn generate(
                 .to_vec1::<u32>()?[0];
             eprintln!("  step {i:3}: s1 top1={a} margin={m:.4}");
         }
-        let sample_pre = sample(&s1_last, &p.cfg, rng)?.unsqueeze(1)?; // [B, 1]
+        let draws = draws_tab.narrow(0, i, 1)?.squeeze(0)?;
+        let ts = std::time::Instant::now();
+        let sample_pre = sample(&s1_last, &p.cfg, &draws)?.unsqueeze(1)?; // [B, 1]
+        t_samp += ts.elapsed().as_secs_f64();
 
+        let ts = std::time::Instant::now();
         let s2_logits = model.decode_s2(&d1.context, &sample_pre)?;
+        t_rest_total += ts.elapsed().as_secs_f64();
         let s2_last = s2_logits.narrow(1, window_len - 1, 1)?.squeeze(1)?;
         if trace {
             let m = top2_margin(&s2_last)?;
@@ -174,7 +202,9 @@ pub fn generate(
                 .to_vec1::<u32>()?[0];
             eprintln!("  step {i:3}: s2 top1={a} margin={m:.4}");
         }
-        let sample_post = sample(&s2_last, &p.cfg, rng)?.unsqueeze(1)?; // [B, 1]
+        let ts = std::time::Instant::now();
+        let sample_post = sample(&s2_last, &p.cfg, &draws)?.unsqueeze(1)?; // [B, 1]
+        t_samp += ts.elapsed().as_secs_f64();
 
         generated_pre.push(sample_pre.clone());
         generated_post.push(sample_post.clone());
@@ -191,6 +221,24 @@ pub fn generate(
         }
     }
 
+    if profile {
+        eprintln!(
+            "[profile] AR loop  {:.1} ms  |  decode_s1+s2 {:.1} ms  |  sampling {:.1} ms",
+            t_loop.elapsed().as_secs_f64() * 1e3,
+            t_rest_total * 1e3,
+            t_samp * 1e3
+        );
+        let [a, b, c, d, e, f, g] = crate::ops::prof_take();
+        let sp = crate::block::attn_prof_take();
+        eprintln!(
+            "[attn] qkv={:.2} splits={:.2} rope={:.2} scores={:.2} out={:.2}",
+            sp.qkv, sp.splits, sp.rope, sp.scores, sp.out
+        );
+        eprintln!(
+            "[prof] scores={a:.2} mask={b:.2} softmax={c:.2} vbmm={d:.2} norm={e:.2} linear={f:.2} other={g:.2}"
+        );
+    }
+    let t_dec = std::time::Instant::now();
     // Final decode over the last max_context positions of the full stream.
     let mut all_pre = x_tokens.0.clone();
     for g in &generated_pre {
@@ -206,6 +254,12 @@ pub fn generate(
     let z_in_s2 = all_post.narrow(1, cs, width)?.contiguous()?;
     let z = tok.decode(&(z_in_s1, z_in_s2))?;
 
+    if profile {
+        eprintln!(
+            "[profile] decode {:.1} ms",
+            t_dec.elapsed().as_secs_f64() * 1e3
+        );
+    }
     // mean over the sample axis: [n*S, L, 6] -> [n, L, 6]
     let w = z.dim(1)?;
     let d_in = z.dim(2)?;

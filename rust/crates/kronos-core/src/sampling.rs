@@ -6,22 +6,35 @@
 //!   `softmax` puts probability exactly 1 on the argmax and `multinomial`
 //!   degenerates to argmax. We take the argmax directly — same outcome, no host
 //!   sync — and this is what gates the golden CSVs.
-//! * **Stochastic** (`top_p < 1.0`): needs a categorical draw. We do NOT
-//!   reproduce torch's Philox stream (par was agreed: distributional, see
-//!   `PORTING_FROM_PYTHON.md` §8). Seeded SplitMix64 + inverse-CDF instead.
+//! * **Stochastic** (`top_p < 1.0` or `top_k > 1`): a categorical draw. We do
+//!   NOT reproduce torch's Philox stream (the agreed-par is *distributional*,
+//!   see `PORTING_FROM_PYTHON.md` §8); uniforms come from a seeded SplitMix64
+//!   and are drawn up front, once per trajectory.
 //!
-//! `top_p` is implemented without `scatter`. Upstream sorts descending, takes
-//! the cumulative softmax, shifts the mask one right, and scatters back. That
-//! is algebraically: token `j` is kept iff the softmax mass of tokens with a
-//! *strictly greater* logit is `<= top_p` (with `rank_j` = count of strictly
-//! greater tokens). Exact for distinct logits and identical in behaviour on
-//! real model outputs.
+//! Phase 5 (batch throughput) moved sampling into **sorted space**, which
+//! replaced two Phase-4 costs with one sort:
 //!
-//! Two upstream details reproduced exactly:
-//! * `filter` **returns** inside the top-k branch, so `top_p` is ignored
-//!   whenever `top_k > 0` (model/kronos.py:347-352).
-//! * the keep test is `>=` the k-th largest (torch keeps ties; `logits < kth`
-//!   removes strictly-less).
+//! * the Phase-4 nucleus filter built a `[B, V, V]` strict-greater table every
+//!   step — 42 MB of intermediate traffic at B=10 — now the filter is a prefix
+//!   count over the descending sort, O(B·V·logV);
+//! * the Phase-4 sampler moved probabilities to the host per step to run the
+//!   inverse CDF — now the whole draw is GPU-side from pre-drawn uniforms.
+//!
+//! Upstream semantics preserved:
+//!  * `filter` RETURNS inside the top-k branch, so `top_p` is ignored whenever
+//!    `top_k > 0` (model/kronos.py:347-352);
+//!  * the kept set is the **contiguous prefix** of the descending sort: rank r
+//!    is kept iff the cumulative mass before it is `<= top_p` — upstream's
+//!    one-right-shift rule verbatim (module-style see model/kronos.py:359-369);
+//!  * renormalising over that kept prefix is torch's multinomial over the
+//!    FILTERED distribution;
+//!  * ties: `logits < kth` removal keeps whole tie groups; a descending sort
+//!    groups them too, and the k-th-largest threshold lands on the same set.
+//!
+//! Traversal order is probability-sorted rather than token-id order. The kept
+//! set and its renormalised probabilities are identical, so the distribution is
+//! unchanged, but individual draws differ from a host-side traversal of the
+//! same uniforms. This is precisely the distributional parity we committed to.
 
 use candle_core::{DType, Device, Result, Tensor};
 
@@ -67,71 +80,17 @@ impl Rng {
     pub fn next_f64(&mut self) -> f64 {
         ((self.next_u64() >> 11) as f64) / (1u64 << 53) as f64
     }
-}
-
-/// Substitute `-inf` without NaN risk: keep ? logit : -BIG.
-///
-/// The reference uses `filter_value = -f32::INFINITY`. We use a large *finite*
-/// number so `shifted = val - rowmax` stays finite: `exp(-BIG - rowmax)` still
-/// underflows to exactly 0, matching torch, without any `inf - inf` hazard on a
-/// row that is entirely -inf (possible only for a degenerate top_k).
-const NEG_BIG: f64 = -1.0e30;
-
-fn apply_keep(logits: &Tensor, keep: &Tensor) -> Result<Tensor> {
-    // stay in the logits' dtype: with fp16 weights the distribution is f16 and
-    // an f32 scalar here would raise a mixed-dtype mul.
-    let keepf = keep.to_dtype(logits.dtype())?;
-    let drop = keepf.affine(-1.0f64, 1.0f64)?; // 1 - keep
-    logits
-        .broadcast_mul(&keepf)?
-        .broadcast_add(&drop.affine(NEG_BIG, 0.0)?)
-}
-
-/// `top_k_top_p_filtering` — the filtered `[B, V]` logits.
-///
-/// **Must already be temperature-scaled**: upstream divides by T *once* in
-/// `sample_from_logits` and then filters (model/kronos.py:374-377), so calling
-/// `filter` on raw logits would scale twice.
-pub fn filter(logits: &Tensor, cfg: &SampleCfg) -> Result<Tensor> {
-    let do_top_k = cfg.top_k > 0;
-    let do_top_p = cfg.top_p < 1.0;
-    if !do_top_k && !do_top_p {
-        return Ok(logits.clone());
+    /// A `[steps, batch]` table of uniforms, drawn in the exact order the loop
+    /// consumes them (step-major, row-minor) so a seeded run is reproducible.
+    pub fn uniform_table(&mut self, steps: usize, batch: usize, dev: &Device) -> Result<Tensor> {
+        let mut v = Vec::with_capacity(steps * batch);
+        for _ in 0..steps {
+            for _ in 0..batch {
+                v.push(self.next_f64() as f32);
+            }
+        }
+        Tensor::from_vec(v, (steps, batch), dev)
     }
-    let last = logits.dims().len() - 1;
-    if do_top_k {
-        let v = logits.dim(last)? as u32;
-        let k = cfg.top_k.min(v).max(1);
-        // threshold = the k-th largest (descending sort position k-1); all
-        // ties above it are kept, matching torch's `logits < kth` removal.
-        let thr = if k == 1 {
-            logits.max_keepdim(last)?
-        } else {
-            logits
-                .sort_last_dim(false)?
-                .0
-                .narrow(last, (k - 1) as usize, 1)?
-        };
-        return apply_keep(logits, &logits.broadcast_ge(&thr)?);
-    }
-    // nucleus on a rank-2 [B, V] tensor:
-    //   gt[b, j, i] = logit_j > logit_i,  mass[j] = sum_i p_i * gt[b,j,i],
-    //   keep[b, j]  = mass[b, j] <= top_p
-    let dims = logits.dims().to_vec();
-    let _ = dims;
-    let _ = last;
-    let p = softmax(logits)?;
-    let row = logits.unsqueeze(1)?; // [B, 1, V] = logit_i (compare axis)
-    let col = logits.unsqueeze(2)?; // [B, V, 1] = logit_j (kept axis)
-                                    // gt[b,j,i] = logit_i > logit_j: "how much mass sits above token j".
-                                    // The comparison direction is load-bearing — pointing it the other way
-                                    // keeps the TAIL tokens instead of the head.
-    let gt = row.broadcast_gt(&col)?.to_dtype(logits.dtype())?;
-    let mass = gt.broadcast_mul(&p.unsqueeze(1)?)?.sum(2)?; // [B, V]
-    let keep = mass.broadcast_le(
-        &Tensor::from_vec(vec![cfg.top_p], (), logits.device())?.to_dtype(mass.dtype())?,
-    )?;
-    apply_keep(logits, &keep)
 }
 
 /// Numerically-stable softmax over the last axis (avoids the cuDNN-gated op).
@@ -143,8 +102,119 @@ pub fn softmax(x: &Tensor) -> Result<Tensor> {
     exp.broadcast_div(&den)
 }
 
+/// One rank-position helper: `[V]` of 0.0, 1.0, ... as f32.
+fn rank_positions(v: u32, dev: &Device) -> Result<Tensor> {
+    Tensor::from_vec(
+        (0..v).map(|i| i as f32).collect::<Vec<_>>(),
+        (v as usize,),
+        dev,
+    )
+}
+
+/// Sorted-space categorical sampling over `[B, V]` logits.
+///
+/// `draws` must be `[B]` uniforms on the same device — the row order matches
+/// the batch (see `Rng::uniform_table`).
+pub fn sample(logits: &Tensor, cfg: &SampleCfg, draws: &Tensor) -> Result<Tensor> {
+    if cfg.top_k == 1 {
+        // argmax: the degenerate multinomial. No host sync, and this is the
+        // path that gates the golden CSVs.
+        return logits.argmax(logits.dims().len() - 1);
+    }
+    let last = logits.dims().len() - 1;
+    let shape = logits.dims().to_vec();
+    let (b, v) = (shape[0], shape[last]);
+
+    // callers usually hand a strided last-position slice; sort needs contiguous
+    let scaled = if cfg.temperature == 1.0 {
+        logits.contiguous()?
+    } else {
+        logits
+            .affine(1.0f64 / cfg.temperature as f64, 0.0)?
+            .contiguous()?
+    };
+
+    // descending sort: rank 0 = highest logit
+    let (vals, idx) = scaled.sort_last_dim(false)?;
+    let probs = softmax(&vals)?;
+    let cdf = probs.cumsum(last)?;
+
+    // ---- kept-prefix length K (one scalar per row) ----
+    let cdf_excl = Tensor::cat(
+        &[
+            &Tensor::zeros((b, 1), probs.dtype(), probs.device())?,
+            &cdf.narrow(last, 0, v - 1)?,
+        ],
+        last,
+    )?;
+    let k_counts = if cfg.top_k > 0 {
+        let k = cfg.top_k.min(v as u32) as f32;
+        // ranks < k are kept -> prefix length min(k, V)
+        k_counts_from_positions(&rank_positions(v as u32, probs.device())?, k as u32, (b, v))?
+    } else {
+        // rank r kept iff cdf_excl[r] <= top_p; the prefix property then makes
+        // the kept set ranks 0..K-1
+        let keep = cdf_excl.broadcast_le(
+            &Tensor::from_vec(vec![cfg.top_p], (), probs.device())?.to_dtype(probs.dtype())?,
+        )?;
+        keep.to_dtype(probs.dtype())?.sum(last)?
+    };
+
+    // ---- sample the rank within the kept prefix ----
+    // renormalise: norm[r] = cdf[r] / cdf[K-1]; pick the LAST rank whose norm
+    // is still below the draw (inverse-CDF), clamped into the prefix against
+    // rounding at u -> 1.
+    let positions = rank_positions(v as u32, probs.device())?.to_dtype(probs.dtype())?;
+    let kpos = positions
+        .unsqueeze(0)?
+        .broadcast_as((b, v))?
+        .broadcast_eq(
+            &k_counts
+                .affine(1.0f64, -1.0)?
+                .unsqueeze(1)?
+                .to_dtype(probs.dtype())?,
+        )?
+        .to_dtype(probs.dtype())?; // [B, V] one-hot at K-1
+    let total_kept = cdf.broadcast_mul(&kpos)?.sum(last)?.unsqueeze(1)?; // [B, 1]
+    let norm = cdf.broadcast_div(&total_kept)?;
+    let lt = norm.broadcast_lt(
+        &draws
+            .to_device(probs.device())?
+            .to_dtype(probs.dtype())?
+            .unsqueeze(1)?,
+    )?;
+    let mut rank = lt.to_dtype(probs.dtype())?.sum(last)?; // [B] f32
+                                                           // clamp to [0, K-1]
+    rank = rank.broadcast_minimum(&k_counts.affine(1.0f64, -1.0)?)?;
+    rank = rank.broadcast_maximum(&Tensor::zeros((b,), probs.dtype(), probs.device())?)?;
+
+    // ---- map rank -> original token id through the sort permutation ----
+    let onehot_rank = positions
+        .unsqueeze(0)?
+        .broadcast_as((b, v))?
+        .broadcast_eq(&rank.unsqueeze(1)?.to_dtype(probs.dtype())?)?
+        .to_dtype(probs.dtype())?;
+    // idx values are token ids < 2^24 -> exact in f32
+    let picked = idx
+        .to_dtype(probs.dtype())?
+        .broadcast_mul(&onehot_rank)?
+        .sum(last)?;
+    picked.to_dtype(DType::U32)
+}
+
+/// Position-mask prefix count when the kept set is "the first k ranks".
+fn k_counts_from_positions(positions: &Tensor, k: u32, (b, v): (usize, usize)) -> Result<Tensor> {
+    let mask = positions
+        .unsqueeze(0)?
+        .broadcast_as((b, v))?
+        .to_dtype(DType::F32)?
+        .broadcast_lt(&Tensor::from_vec(vec![k as f32], (), positions.device())?)?;
+    mask.to_dtype(DType::F32)?.sum(1)
+}
+
 /// Cumulative softmax mass of the tokens *strictly greater* than each given id
 /// — the quantity upstream's nucleus test compares against `top_p`.
+/// Audit-only (used by the sampler assertions, not in the loop).
 ///
 /// Rank-2 `[B, V]` logits that are already temperature-scaled; `ids` is `[B]`.
 pub fn strictly_greater_mass(logits: &Tensor, ids: &Tensor) -> Result<Tensor> {
@@ -155,10 +225,12 @@ pub fn strictly_greater_mass(logits: &Tensor, ids: &Tensor) -> Result<Tensor> {
     let p = softmax(logits)?;
     let row = logits.unsqueeze(1)?; // [B, 1, V] = logit_i
     let col = logits.unsqueeze(2)?; // [B, V, 1] = logit_j
+                                    // gt[b,j,i] = logit_i > logit_j: "how much mass sits above token j".
+                                    // The comparison direction is load-bearing — pointing it the other way
+                                    // keeps the TAIL tokens instead of the head.
     let gt = row.broadcast_gt(&col)?.to_dtype(logits.dtype())?;
-    let mass = gt.broadcast_mul(&p.unsqueeze(1)?)?.sum(2)?; // [B, V]
+    let mass = gt.broadcast_mul(&p.unsqueeze(1)?)?.sum(2)?.flatten_all()?; // [B, V]
     let mass_cpu = mass
-        .flatten_all()?
         .to_device(&Device::Cpu)?
         .to_dtype(DType::F32)?
         .to_vec1::<f32>()?;
@@ -170,55 +242,6 @@ pub fn strictly_greater_mass(logits: &Tensor, ids: &Tensor) -> Result<Tensor> {
         .map(|r| mass_cpu[r * v + ids_cpu[r] as usize])
         .collect();
     Tensor::from_vec(out, (b,), &Device::Cpu)
-}
-
-/// Sample one token per row from `[B, V]` logits.
-///
-/// `top_k == 1` -> argmax (no host sync). Otherwise: filter, softmax, then
-/// host-side inverse-CDF with the seeded RNG. The deliberate sync is the very
-/// place Phase 5 fuses away; here we buy exact distributional semantics.
-pub fn sample(logits: &Tensor, cfg: &SampleCfg, rng: &mut Rng) -> Result<Tensor> {
-    if cfg.top_k == 1 {
-        return logits.argmax(logits.dims().len() - 1);
-    }
-    if cfg.temperature == 1.0 {
-        // exact no-op path: avoid an affine round trip when T == 1
-        let filtered = filter(logits, cfg)?;
-        let probs = softmax(&filtered)?;
-        return inverse_cdf(&probs, rng);
-    }
-    let scaled = logits.affine(1.0f64 / cfg.temperature as f64, 0.0)?;
-    let filtered = filter(&scaled, cfg)?;
-    let probs = softmax(&filtered)?;
-    inverse_cdf(&probs, rng)
-}
-
-/// Inverse-CDF draw over a row-major `[B, V]` probability tensor.
-fn inverse_cdf(probs: &Tensor, rng: &mut Rng) -> Result<Tensor> {
-    let dims = probs.dims().to_vec();
-    let b = dims[0];
-    let v = dims[dims.len() - 1];
-    let flat = probs
-        .flatten_all()?
-        .to_device(&Device::Cpu)?
-        .to_dtype(DType::F32)?
-        .to_vec1::<f32>()?;
-    let mut ids = Vec::with_capacity(b);
-    for r in 0..b {
-        let row = &flat[r * v..r * v + v];
-        let u = rng.next_f64() as f32;
-        let mut acc = 0.0f32;
-        let mut pick = v - 1;
-        for (i, p) in row.iter().enumerate() {
-            acc += *p;
-            if acc > u {
-                pick = i;
-                break;
-            }
-        }
-        ids.push(pick as u32);
-    }
-    Tensor::from_vec(ids, (b,), &Device::Cpu)?.to_device(probs.device())
 }
 
 #[cfg(test)]
@@ -235,92 +258,135 @@ mod tests {
             top_k: 1,
             top_p: 1.0,
         };
-        let ids = sample(&logits, &cfg, &mut Rng::new(0)).unwrap();
+        let tiny = Rng::new(0).uniform_table(1, 2, &dev).unwrap();
+        let ids = sample(&logits, &cfg, &tiny).unwrap();
         assert_eq!(ids.to_vec1::<u32>().unwrap(), vec![1u32, 2]);
     }
 
     #[test]
-    fn filtered_mass_leaks_nothing() {
-        // after top_k=1 the kept token must carry probability 1.0 exactly, not
-        // just nearly — zero-mask padding would leak exp(-rowmax).
+    fn inverse_cdf_picks_the_expected_token() {
+        // logits [0,-1,-2] on T=1: p = [.66524094, .24472848, .09003057];
+        // cdf rising = [.6652, .9099, 1.0]. u = 0.8 -> rank 1 = token 1.
         let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![0.0f32, 10.0, 0.0], (1, 3), &dev).unwrap();
+        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let draws = Tensor::from_vec(vec![0.8f32], (1,), &dev).unwrap();
         let cfg = SampleCfg {
             temperature: 1.0,
-            top_k: 1,
-            top_p: 1.0,
-        };
-        let p = softmax(&filter(&logits, &cfg).unwrap())
-            .unwrap()
-            .to_vec2::<f32>()
-            .unwrap();
-        assert!((p[0][1] - 1.0).abs() < 1e-6, "got {}", p[0][1]);
-        assert_eq!(p[0][0], 0.0);
-        assert_eq!(p[0][2], 0.0);
-    }
-
-    #[test]
-    fn topk2_removes_only_the_smallest() {
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![3.0f32, 2.0, 1.0], (1, 3), &dev).unwrap();
-        let p = filter(
-            &logits,
-            &SampleCfg {
-                temperature: 1.0,
-                top_k: 2,
-                top_p: 0.0,
-            },
-        )
-        .unwrap()
-        .to_vec2::<f32>()
-        .unwrap();
-        assert_eq!(p[0], vec![3.0f32, 2.0, -1.0e30]);
-    }
-
-    #[test]
-    fn nucleus_membership_matches_hand_computation() {
-        // logits [0, -1, -2] -> p = exp/l1 = [.66524094, .24472848, .09003057]
-        // (the earlier [.5,.3,.2] was a wrong hand computation -- caught by the
-        // very assertion it was meant to validate). Strictly-greater masses:
-        //   j=0: 0        j=1: p0 = .66524094      j=2: p0+p1 = .90996945
-        // so with top_p=.7: tokens 0,1 are in; token 2 is out.
-        let dev = Device::Cpu;
-        // one id per batch row: replicate the row to probe all three tokens
-        let logits = Tensor::from_vec(
-            vec![0.0f32, -1.0, -2.0, 0.0, -1.0, -2.0, 0.0, -1.0, -2.0],
-            (3, 3),
-            &dev,
-        )
-        .unwrap();
-        let ids = Tensor::from_vec(vec![0u32, 1, 2], (3,), &dev).unwrap();
-        let m = match strictly_greater_mass(&logits, &ids) {
-            Ok(v) => v.to_vec1::<f32>().unwrap(),
-            Err(e) => panic!("strictly_greater_mass failed: {e}"),
-        };
-        assert!(
-            (m[0] - 0.0).abs() < 1e-5,
-            "m[0]={} must be 0 (max token, nothing greater)",
-            m[0]
-        );
-        assert!((m[1] - 0.665_240_94).abs() < 1e-5, "m[1]={}", m[1]);
-        assert!((m[2] - 0.909_969_45).abs() < 1e-5, "m[2]={}", m[2]);
-    }
-
-    #[test]
-    fn temperature_scales_the_distribution() {
-        // T = 2 should NOT collapse; T -> tiny should sharpen to argmax-only.
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![2.0f32, 1.0], (1, 2), &dev).unwrap();
-        let hot = SampleCfg {
-            temperature: 0.01,
             top_k: 0,
             top_p: 1.0,
         };
-        let p = softmax(&logits.affine(1.0 / 0.01, 0.0).unwrap())
+        let id = sample(&logits, &cfg, &draws)
             .unwrap()
-            .to_vec2::<f32>()
+            .to_vec1::<u32>()
             .unwrap();
-        assert!(p[0][0] > 0.999, "sharpened: {}", p[0][0]);
-        let _ = hot;
+        assert_eq!(id[0], 1, "u=0.8 must land in token 1's cumulative cell");
+        let draws = Tensor::from_vec(vec![0.99f32], (1,), &dev).unwrap();
+        let id = sample(&logits, &cfg, &draws)
+            .unwrap()
+            .to_vec1::<u32>()
+            .unwrap();
+        assert_eq!(id[0], 2, "u=0.99 must land in token 2's cell");
+    }
+
+    #[test]
+    fn nucleus_excludes_the_tail() {
+        // p = [.6652, .2447, .0900]; cdf_excl = [0, .6652, .9099].
+        // top_p = 0.7: ranks 0,1 kept (0 and .6652 <= .7); rank 2 excluded.
+        let dev = Device::Cpu;
+        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let cfg = SampleCfg {
+            temperature: 1.0,
+            top_k: 0,
+            top_p: 0.7,
+        };
+        let _draws = Rng::new(1).uniform_table(64, 1, &dev).unwrap();
+        for u in 0..64u64 {
+            let draw = Tensor::from_vec(vec![(u as f64 + 0.5) / 64.0], (1,), &dev).unwrap();
+            let id = sample(&logits, &cfg, &draw)
+                .unwrap()
+                .to_vec1::<u32>()
+                .unwrap();
+            assert_ne!(id[0], 2, "token 2 sits outside a top_p=0.7 nucleus");
+        }
+    }
+
+    #[test]
+    fn nucleus_never_drops_the_head() {
+        let dev = Device::Cpu;
+        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let cfg = SampleCfg {
+            temperature: 1.0,
+            top_k: 0,
+            top_p: 0.7,
+        };
+        // u=0.0 + eps must still land on rank 0 (the only token under any
+        // strict-first-kept-cdf reading)
+        let draw = Tensor::from_vec(vec![0.001f32], (1,), &dev).unwrap();
+        let id = sample(&logits, &cfg, &draw)
+            .unwrap()
+            .to_vec1::<u32>()
+            .unwrap();
+        assert_eq!(id[0], 0);
+    }
+
+    #[test]
+    fn topk2_removes_the_smallest_only() {
+        // logits [3,2,1], top_k=2 -> kept set {3.0, 2.0}; token 2 must NEVER
+        // appear over a sweep of all uniforms.
+        let dev = Device::Cpu;
+        let logits = Tensor::from_vec(vec![3.0f32, 2.0, 1.0], (1, 3), &dev).unwrap();
+        let cfg = SampleCfg {
+            temperature: 1.0,
+            top_k: 2,
+            top_p: 1.0,
+        };
+        for i in 0..64u64 {
+            let draw = Tensor::from_vec(vec![(i as f64 + 0.5) / 64.0], (1,), &dev).unwrap();
+            let id = sample(&logits, &cfg, &draw)
+                .unwrap()
+                .to_vec1::<u32>()
+                .unwrap();
+            assert!(id[0] == 0 || id[0] == 1, "draw {i}: got token {}", id[0]);
+        }
+    }
+
+    #[test]
+    fn filtered_renormalisation_covers_the_kept_set() {
+        // top_p just under the cumulative boundary: kept = {0,1}; draws must
+        // still cover BOTH kept tokens all the way to u -> 1 - eps.
+        let dev = Device::Cpu;
+        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let cfg = SampleCfg {
+            temperature: 1.0,
+            top_k: 0,
+            top_p: 0.7,
+        };
+        let draw = Tensor::from_vec(vec![0.999f32], (1,), &dev).unwrap();
+        let id = sample(&logits, &cfg, &draw)
+            .unwrap()
+            .to_vec1::<u32>()
+            .unwrap();
+        assert_eq!(
+            id[0], 1,
+            "renormalised tail of the kept set must be reachable"
+        );
+    }
+
+    #[test]
+    fn uniform_table_shape_and_reproducibility() {
+        let dev = Device::Cpu;
+        let a = Rng::new(123).uniform_table(3, 4, &dev).unwrap();
+        let b = Rng::new(123).uniform_table(3, 4, &dev).unwrap();
+        assert_eq!(a.dims(), &[3, 4]);
+        assert_eq!(a.to_vec2::<f32>().unwrap(), b.to_vec2::<f32>().unwrap());
+        // row-major step-major order matches the loop's consumption order
+        let first_step = a
+            .narrow(0, 0, 1)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1::<f32>()
+            .unwrap();
+        assert!(first_step.iter().all(|x| (0.0..1.0).contains(x)));
     }
 }

@@ -79,6 +79,40 @@ pub fn rms_norm(x: &Tensor, weight: &Tensor, eps: f32) -> Result<Tensor> {
 /// Getting the half-split backwards is the easiest way to build a model that
 /// loads cleanly and forecasts garbage. Upstream caches cos/sin keyed on
 /// sequence length (module.py:294); we build the table once for `max_len`.
+/// Env-gated profile accumulators. 0: scores bmm, 1: mask add, 2: softmax,
+/// 3: value bmm, 4: RMSNorm, 5: linear, 6: head/global ops.
+static PROF: std::sync::Mutex<[f64; 7]> = std::sync::Mutex::new([0.0; 7]);
+
+#[doc(hidden)]
+pub fn prof_take() -> [f64; 7] {
+    if std::env::var("KRONOS_OPS_PROFILE").is_err() {
+        return [0.0; 7];
+    }
+    match PROF.try_lock() {
+        Ok(mut t) => std::mem::replace(&mut *t, [0.0; 7]),
+        Err(_) => [0.0; 7],
+    }
+}
+
+#[doc(hidden)]
+pub fn __prof_norm(dt: f64) -> f64 {
+    if std::env::var("KRONOS_OPS_PROFILE").is_ok() {
+        if let Ok(mut t) = PROF.try_lock() {
+            t[4] += dt;
+        }
+    }
+    dt
+}
+
+#[doc(hidden)]
+fn prof_add(slot: usize, dt: f64) {
+    if std::env::var("KRONOS_OPS_PROFILE").is_ok() {
+        if let Ok(mut t) = PROF.try_lock() {
+            t[slot] += dt;
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct RotaryCache {
     cos: Tensor,
@@ -152,11 +186,68 @@ fn rotate_half_apply(x: &Tensor, cos: &Tensor, sin: &Tensor) -> Result<Tensor> {
 ///
 /// Shapes: `q`, `k`, `v` are `[B, H, L, hd]`. `causal` applies a lower-triangular
 /// mask so position `i` can only attend to positions `0..=i`.
+/// Cached causal masks, keyed on (device, dtype, Lq, Lk).
+///
+/// The Phase-4 code rebuilt this from `from_vec` on EVERY call: 8 layers x 2
+/// attention passes x 120 steps = 1,920 constructions per forecast, each a
+/// 262,144-element host vector plus a 1 MB host->device upload (measured to
+/// inflate the AR loop's CPU time by seconds). Kronos only ever uses two
+/// shapes (Lq==Lk) and one query-row cross-attention shape, so the cache hits
+/// always.
+type MaskCache = std::collections::HashMap<(u8, usize, usize, usize), Tensor>;
+
+fn causal_mask(lq: usize, lk: usize, dev: &Device, dtype: DType) -> Result<Tensor> {
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<MaskCache>> = OnceLock::new();
+    let dev_id = match dev {
+        Device::Cpu => 0u8,
+        Device::Cuda(_) => 1u8,
+        Device::Metal(_) => 2u8,
+    };
+    let key = (dev_id, dtype.as_str().as_ptr() as usize, lq, lk);
+    let mut guard = CACHE
+        .get_or_init(|| Mutex::new(MaskCache::new()))
+        .lock()
+        .map_err(|_| candle_core::Error::Msg("mask cache poisoned".into()))?;
+    if let Some(t) = guard.get(&key) {
+        return Ok(t.clone());
+    }
+    let mask = Tensor::from_vec(
+        (0..lq * lk)
+            .map(|idx| {
+                let i = idx / lk;
+                let j = idx % lk;
+                if j > i {
+                    f64::NEG_INFINITY
+                } else {
+                    0.0
+                }
+            })
+            .collect::<Vec<_>>(),
+        (lq, lk),
+        dev,
+    )?
+    .to_dtype(dtype)?;
+    guard.insert(key, mask.clone());
+    Ok(mask)
+}
+
+/// Exposed for the microbench head-to-head: candle's fused SDPA attempt.
+/// Measured: candle 0.11 has no CUDA implementation for it in either
+/// backend ("no cuda implementation for metal-sdpa"), even with the cudnn
+/// feature compiled against pip's bundled libs. Kept so the microbench can
+/// assert that rather than guess.
+#[doc(hidden)]
+pub fn fused_sdpa(q: &Tensor, k: &Tensor, v: &Tensor) -> Result<Tensor> {
+    candle_nn::ops::sdpa(q, k, v, None, true, 1.0, 0.0)
+}
+
 pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, causal: bool) -> Result<Tensor> {
     let hd = q.dim(3)? as f64;
-    let scale = (1.0 / hd.sqrt()) as f32;
+    let scale = (1.0 / hd.sqrt()) as f32; // applied AFTER the product, as torch does
     let (b, h, lq, _) = q.dims4()?;
     let lk = k.dim(2)?;
+    let t0 = std::time::Instant::now();
 
     // scores = (Q * K^T) * scale
     let kt = k.transpose(2, 3)?.contiguous()?; // [B, H, hd, Lk]
@@ -164,38 +255,28 @@ pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, causal: bool) -> Result<Tensor> 
     if scale != 1.0 {
         scores = scores.affine(scale as f64, 0.0)?;
     }
+    prof_add(0, t0.elapsed().as_secs_f64());
 
     if causal {
-        // mask[i][j] = -inf when j > i (cannot attend to the future)
-        let mask = Tensor::from_vec(
-            (0..lq * lk)
-                .map(|idx| {
-                    let i = idx / lk;
-                    let j = idx % lk;
-                    if j > i {
-                        f64::NEG_INFINITY
-                    } else {
-                        0.0
-                    }
-                })
-                .collect::<Vec<_>>(),
-            (lq, lk),
-            q.device(),
-        )?
-        .to_dtype(q.dtype())? // match the scores dtype (f32 or f16)
-        .broadcast_as((b, h, lq, lk))?;
+        // mask[i][j] = -inf when j > i; cached by shape (see causal_mask)
+        let mask = causal_mask(lq, lk, q.device(), q.dtype())?.broadcast_as((b, h, lq, lk))?;
         scores = scores.broadcast_add(&mask)?;
     }
 
     // softmax over the last axis, then multiply by V
     // (manual because candle's softmax_last_dim also requires cuDNN on CUDA)
+    let t2 = std::time::Instant::now();
     let last = scores.dims().len() - 1;
     let max = scores.max_keepdim(last)?;
     let shifted = scores.broadcast_sub(&max)?;
     let exp = shifted.exp()?;
     let sum = exp.sum_keepdim(last)?;
     let probs = exp.broadcast_div(&sum)?;
-    probs.matmul(&v.contiguous()?)
+    prof_add(2, t2.elapsed().as_secs_f64());
+    let t3 = std::time::Instant::now();
+    let out = probs.matmul(&v.contiguous()?)?;
+    prof_add(3, t3.elapsed().as_secs_f64());
+    Ok(out)
 }
 
 /// `F.normalize(z, dim=-1)` — `model/module.py:246`.

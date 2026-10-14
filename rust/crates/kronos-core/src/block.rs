@@ -55,6 +55,34 @@ impl FeedForward {
 ///
 /// Self-attention is always `is_causal=True` at inference (module.py:349) and
 /// the predictor never supplies a `key_padding_mask`, so there is no mask path.
+/// Env-gated per-section timings (synchronised, hence accurate).
+#[doc(hidden)]
+pub struct AttnSections {
+    pub qkv: f64,
+    pub splits: f64,
+    pub rope: f64,
+    pub scores: f64,
+    pub out: f64,
+}
+static ATTN_PROF: std::sync::Mutex<AttnSections> = std::sync::Mutex::new(AttnSections {
+    qkv: 0.0,
+    splits: 0.0,
+    rope: 0.0,
+    scores: 0.0,
+    out: 0.0,
+});
+#[doc(hidden)]
+pub fn attn_prof_take() -> AttnSections {
+    let a = ATTN_PROF.lock().unwrap();
+    AttnSections {
+        qkv: a.qkv,
+        splits: a.splits,
+        rope: a.rope,
+        scores: a.scores,
+        out: a.out,
+    }
+}
+
 pub struct SelfAttention {
     q: Tensor,
     k: Tensor,
@@ -94,6 +122,91 @@ impl SelfAttention {
         let (b, l, _) = x.dims3()?;
         x.reshape((b, l, self.n_heads, self.head_dim))?
             .permute((0, 2, 1, 3))
+    }
+
+    fn t0() -> std::time::Instant {
+        std::time::Instant::now()
+    }
+    fn mark(f: impl FnOnce(&mut AttnSections)) {
+        if std::env::var("KRONOS_ATTN_PROFILE").is_ok() {
+            if let Ok(mut a) = ATTN_PROF.lock() {
+                f(&mut a)
+            }
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn forward_instrumented(&self, x: &Tensor, prof: bool) -> Result<Tensor> {
+        use crate::ops::{linear, sdpa};
+        let (b, l, _) = x.dims3()?;
+        let d = self.d_model;
+        let h = self.n_heads;
+        let hd = self.head_dim;
+        let ta = SelfAttention::t0();
+        let qkv = {
+            let q = linear(x, &self.q, Some(&self.qb))?;
+            let k = linear(x, &self.k, Some(&self.kb))?;
+            let v = linear(x, &self.v, Some(&self.vb))?;
+            (q, k, v)
+        };
+        let qkv_ms = if prof {
+            SelfAttention::t0().duration_since(ta).as_secs_f64()
+        } else {
+            0.0
+        };
+        let tb = SelfAttention::t0();
+        let (q, k, v) = qkv;
+        let q = q
+            .reshape((b, l, h, hd))?
+            .permute((0, 2, 1, 3))?
+            .contiguous()?;
+        let k = k
+            .reshape((b, l, h, hd))?
+            .permute((0, 2, 1, 3))?
+            .contiguous()?;
+        let v = v
+            .reshape((b, l, h, hd))?
+            .permute((0, 2, 1, 3))?
+            .contiguous()?;
+        let splits_ms = if prof {
+            SelfAttention::t0().duration_since(tb).as_secs_f64()
+        } else {
+            0.0
+        };
+        let tc = SelfAttention::t0();
+        let (q, k) = self.rope.apply(&q, &k)?;
+        let rope_ms = if prof {
+            SelfAttention::t0().duration_since(tc).as_secs_f64()
+        } else {
+            0.0
+        };
+        let td = SelfAttention::t0();
+        let ctx = sdpa(&q, &k, &v, true)?;
+        let scores_ms = if prof {
+            SelfAttention::t0().duration_since(td).as_secs_f64()
+        } else {
+            0.0
+        };
+        let te = SelfAttention::t0();
+        let ctx = ctx
+            .permute((0, 2, 1, 3))?
+            .contiguous()?
+            .reshape((b, l, d))?;
+        let out = linear(&ctx, &self.o, Some(&self.ob))?;
+        let out_ms = if prof {
+            SelfAttention::t0().duration_since(te).as_secs_f64()
+        } else {
+            0.0
+        };
+        if prof {
+            SelfAttention::mark(|a| {
+                a.qkv += qkv_ms;
+                a.splits += splits_ms;
+                a.rope += rope_ms;
+                a.scores += scores_ms;
+                a.out += out_ms;
+            });
+        }
+        Ok(out)
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
@@ -139,7 +252,12 @@ impl TransformerBlock {
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
         let n1 = rms_norm(x, &self.norm1, self.eps)?;
-        let h = x.broadcast_add(&self.attn.forward(&n1)?)?;
+        let attn_out = if std::env::var("KRONOS_ATTN_PROFILE").is_ok() {
+            self.attn.forward_instrumented(&n1, true)?
+        } else {
+            self.attn.forward(&n1)?
+        };
+        let h = x.broadcast_add(&attn_out)?;
         let n2 = rms_norm(&h, &self.norm2, self.eps)?;
         h.broadcast_add(&self.ffn.forward(&n2)?)
     }

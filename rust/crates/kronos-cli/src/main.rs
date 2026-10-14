@@ -29,7 +29,7 @@ USAGE:
                     [--temperature F] [--max-context N] [--seed N]
                     [--golden <csv>] [--out <csv>]
 
-  kronos sampler-audit --data <csv> --model-dir <d> --tok-dir <d> [--ctx N] [--seed N]
+  kronos microbench --samples N            # per-op overhead probe\n  kronos sampler-audit --data <csv> --model-dir <d> --tok-dir <d> [--ctx N] [--seed N]
   kronos precision-report  --data <csv> --model-dir <d> --tok-dir <d>
                     [--ctx N] [--pred-len N] [--samples N]
 "
@@ -48,6 +48,7 @@ fn main() -> Result<()> {
         "predict" => cmd_predict(&args[1..]),
         "sampler-audit" => cmd_sampler_audit(&args[1..]),
         "precision-report" => cmd_precision(&args[1..]),
+        "microbench" => cmd_microbench(&args[1..]),
         "-h" | "--help" | "help" => {
             print!("{}", usage());
             Ok(())
@@ -459,10 +460,11 @@ fn cmd_sampler_audit(args: &[String]) -> Result<()> {
         top_k: 0,
         top_p: 0.9,
     };
-    let mut rng = kronos_core::sampling::Rng::new(f.seed);
+    let tab = kronos_core::sampling::Rng::new(f.seed).uniform_table(draws, 1, last.device())?;
     let mut ids = Vec::with_capacity(draws);
-    for _ in 0..draws {
-        let id = kronos_core::sampling::sample(&last, &cfg_hot, &mut rng)?;
+    for i in 0..draws {
+        let d = tab.narrow(0, i, 1)?.squeeze(0)?;
+        let id = kronos_core::sampling::sample(&last, &cfg_hot, &d)?;
         ids.push(id.to_device(&Device::Cpu)?.to_vec1::<u32>()?[0]);
     }
     // (1) no draw outside the nucleus
@@ -759,6 +761,125 @@ fn cmd_precision(args: &[String]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Per-op overhead probe: run a chain of tiny ops at a realistic shape and
+/// report wall time per op. Diagnosed the Phase-5 finding that the port was
+/// overhead-bound (~0.6 ms/op) rather than FLOP-bound.
+fn cmd_microbench(args: &[String]) -> Result<()> {
+    let mut batch = 10usize;
+    let mut reps = 2000usize;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--samples" => {
+                i += 1;
+                batch = args[i].parse()?;
+            }
+            "--reps" => {
+                i += 1;
+                reps = args[i].parse()?;
+            }
+            other => anyhow::bail!("unknown flag `{other}`"),
+        }
+        i += 1;
+    }
+    let dev = Device::new_cuda_or_cpu();
+    let t = Tensor::randn(0f32, 1., (batch, 512, 512), &dev)?;
+    // warmup
+    for _ in 0..50 {
+        let _x = t.sqr()?.affine(1.0, 0.0)?;
+    }
+    t.device().synchronize()?;
+    let t0 = std::time::Instant::now();
+    for _ in 0..reps {
+        let _x = t.sqr()?.affine(2.0, 0.0)?;
+    }
+    t.device().synchronize()?;
+    let per = t0.elapsed().as_secs_f64() / reps as f64;
+    println!(
+        "sqr+affine at ({batch},512,512) f32: {per:.3} ms/op over {reps} reps  (gpu {:?})",
+        p_name(&dev)
+    );
+    // and a big-GEMM reference for contrast
+    let a = Tensor::randn(0f32, 1., (batch * 512, 512), &dev)?;
+    let w = Tensor::randn(0f32, 1., (1024, 512), &dev)?;
+    let w = w.t()?;
+    for _ in 0..10 {
+        let _y = a.matmul(&w)?;
+    }
+    t.device().synchronize()?;
+    let t1 = std::time::Instant::now();
+    for _ in 0..reps {
+        let _y = a.matmul(&w)?;
+    }
+    t.device().synchronize()?;
+    let per = t1.elapsed().as_secs_f64() / reps as f64;
+    println!("matmul {batch}x512x1024 f32: {per:.3} ms/call");
+
+    // ---- SDPA head-to-head at the real attention shape ----
+    let lq = 512usize;
+    let q = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
+    let k = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
+    let v = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
+    let fused = || -> anyhow::Result<Tensor> {
+        kronos_core::ops::fused_sdpa(&q, &k, &v).map_err(anyhow::Error::from)
+    };
+    match fused() {
+        Ok(_) => {
+            let t = std::time::Instant::now();
+            for _ in 0..50 {
+                let _ = fused()?;
+            }
+            q.device().synchronize()?;
+            println!(
+                "sdpa(cuDNN fused): {:.3} ms/call",
+                t.elapsed().as_secs_f64() / 50.0 * 1e3
+            );
+        }
+        Err(e) => println!("sdpa(cuDNN fused) FAILED: {e}"),
+    }
+    let manual = |q: &Tensor| -> anyhow::Result<f64> {
+        let t = std::time::Instant::now();
+        for _ in 0..10 {
+            let kt = k.transpose(2, 3)?.contiguous()?;
+            let mut scores = q.matmul(&kt)?;
+            scores = scores.affine(0.125, 0.0)?;
+            let mask = Tensor::from_vec(
+                (0..lq * lq)
+                    .map(|i| {
+                        let i2 = i / lq;
+                        let j = i % lq;
+                        if j > i2 {
+                            f64::NEG_INFINITY
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                (lq, lq),
+                &dev,
+            )?
+            .to_dtype(q.dtype())?
+            .broadcast_as((batch, 8, lq, lq))?;
+            scores = scores.broadcast_add(&mask)?;
+            let last = scores.dims().len() - 1;
+            let max = scores.max_keepdim(last)?;
+            let expd = scores.broadcast_sub(&max)?.exp()?;
+            let sm = expd.sum_keepdim(last)?;
+            let pr = expd.broadcast_div(&sm)?;
+            let _o = pr.matmul(&v.contiguous()?)?;
+        }
+        q.device().synchronize()?;
+        Ok(t.elapsed().as_secs_f64() / 10.0 * 1e3)
+    };
+    println!("sdpa(manual chain): {:.3} ms/call", manual(&q)?);
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn p_name(dev: &Device) -> String {
+    format!("{dev:?}")
 }
 
 /// Small helper so `info` can work without a GPU (CI on CPU-only runners).
