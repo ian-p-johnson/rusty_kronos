@@ -161,7 +161,9 @@ pub fn sample(logits: &Tensor, cfg: &SampleCfg, draws: &Tensor) -> Result<Tensor
     // rounding at u -> 1.
     let positions = rank_positions(v as u32, &probs.device())?;
     // one-hot of kept_last (K-1) over the rank axis: [B, V]
-    let kpos = &kcounts_f - 1.0;
+    // `kpos` MUST be [B, 1]: a bare [B] right-aligns to [1, B] and only
+    // broadcasts legally when B == 1, which is all the old gates ever ran.
+    let kpos = (&kcounts_f - 1.0).unsqueeze(1);
     let konehot = positions
         .unsqueeze(0)
         .expand([b, v], false)
@@ -252,6 +254,66 @@ fn tch_err(e: tch::TchError) -> tch::TchError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn batched_sampling_is_row_independent() {
+        // Regression gate for a latent cross-row bug: `kpos` was [B] where the
+        // comparison needs [B, 1], which broadcasts legally only when B == 1.
+        // Every pre-tch gate ran B == 1 (goldens are top_k=1; the audit draws
+        // 256 rows of ONE series), so the bug shipped. Sampling a row alone
+        // must equal sampling it inside a batch, for every row and every cfg.
+        let (b, v) = (8i64, 64i64);
+        // deterministic, well-separated logits
+        let mut data = Vec::with_capacity((b * v) as usize);
+        for i in 0..(b * v) {
+            data.push(((i * 37 % 19) as f32) - 9.0 + (i % b) as f32 * 0.5);
+        }
+        let logits = Tensor::from_slice(&data).reshape([b, v]);
+        let draws = Tensor::from_slice(&[0.05f32, 0.21, 0.33, 0.44, 0.55, 0.66, 0.77, 0.91]);
+        for cfg in [
+            SampleCfg {
+                temperature: 0.6,
+                top_k: 0,
+                top_p: 0.9,
+            },
+            SampleCfg {
+                temperature: 1.0,
+                top_k: 0,
+                top_p: 0.7,
+            },
+            SampleCfg {
+                temperature: 1.0,
+                top_k: 5,
+                top_p: 0.9,
+            },
+            SampleCfg {
+                temperature: 1.3,
+                top_k: 0,
+                top_p: 1.0,
+            },
+        ] {
+            let batched = sample(&logits, &cfg, &draws).unwrap();
+            let vids: Vec<i32> = (&batched).try_into().unwrap();
+            for i in 0..b {
+                let row = sample(
+                    &logits.shallow_clone().narrow(0, i, 1),
+                    &cfg,
+                    &draws.shallow_clone().narrow(0, i, 1),
+                )
+                .unwrap();
+                let v1: Vec<i32> = (&row).try_into().unwrap();
+                assert_eq!(
+                    vids[i as usize], v1[0],
+                    "row {i} differs between batch and single-row sampling (T={} top_k={} top_p={})",
+                    cfg.temperature, cfg.top_k, cfg.top_p
+                );
+                assert!(
+                    (0..v as i32).contains(&vids[i as usize]),
+                    "sampled id out of range for row {i}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn deterministic_topk1_is_argmax() {

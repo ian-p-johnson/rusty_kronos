@@ -26,7 +26,7 @@ USAGE:
 
   kronos predict   --data <csv> --model-dir <d> --tok-dir <d>
                     [--ctx N] [--pred-len N] [--samples N] [--top-k N] [--top-p F]
-                    [--temperature F] [--max-context N] [--seed N]
+                    [--temperature F] [--max-context N] [--seed N] [--dtype fp32|fp16|bf16]
                     [--golden <csv>] [--out <csv>]
 
   kronos microbench --samples N            # per-op overhead probe\n  kronos sampler-audit --data <csv> --model-dir <d> --tok-dir <d> [--ctx N] [--seed N]
@@ -225,9 +225,9 @@ fn load_phase4(
     tok_dir: &Path,
     ctx: usize,
     pred_len: usize,
+    dtype: DType,
 ) -> anyhow::Result<Phase4> {
     let dev = tch::Device::cuda_if_available();
-    let dtype = DType::Float;
     let tok_cfg =
         TokenizerConfig::from_json(&std::fs::read_to_string(tok_dir.join("config.json"))?)?;
     tok_cfg.validate()?;
@@ -271,6 +271,7 @@ struct CommonFlags {
     seed: u64,
     out: Option<PathBuf>,
     golden: Option<PathBuf>,
+    dtype: DType,
 }
 
 fn parse_common(args: &[String]) -> anyhow::Result<CommonFlags> {
@@ -288,6 +289,7 @@ fn parse_common(args: &[String]) -> anyhow::Result<CommonFlags> {
         seed: 123,
         out: None,
         golden: None,
+        dtype: DType::Float,
     };
     let mut i = 0;
     let get = |k: &str, args: &[String], i: &mut usize| -> anyhow::Result<String> {
@@ -311,6 +313,14 @@ fn parse_common(args: &[String]) -> anyhow::Result<CommonFlags> {
             "--temperature" => f.temperature = get("temperature", args, &mut i)?.parse()?,
             "--max-context" => f.max_context = get("max-context", args, &mut i)?.parse()?,
             "--seed" => f.seed = get("seed", args, &mut i)?.parse()?,
+            "--dtype" => {
+                f.dtype = match get("dtype", args, &mut i)?.as_str() {
+                    "fp32" | "float32" => DType::Float,
+                    "fp16" | "float16" | "half" => DType::Half,
+                    "bf16" | "bfloat16" => DType::BFloat16,
+                    other => anyhow::bail!("--dtype must be fp32, fp16 or bf16 (got `{other}`)"),
+                }
+            }
             other => anyhow::bail!("unknown flag `{other}`"),
         }
         i += 1;
@@ -329,7 +339,7 @@ fn parse_common(args: &[String]) -> anyhow::Result<CommonFlags> {
 /// golden CSV (same schema) with rtol=1e-5, exiting 1 on mismatch.
 fn cmd_predict(args: &[String]) -> Result<()> {
     let f = parse_common(args)?;
-    let ph = load_phase4(&f.data, &f.model_dir, &f.tok_dir, f.ctx, f.pred_len)?;
+    let ph = load_phase4(&f.data, &f.model_dir, &f.tok_dir, f.ctx, f.pred_len, f.dtype)?;
     let p = kronos_core::ar::ArParams::new(
         f.max_context,
         f.pred_len,
@@ -427,7 +437,7 @@ fn cmd_predict(args: &[String]) -> Result<()> {
 /// The three agreed sampler assertions (parity/README.md "stochastic" tier).
 fn cmd_sampler_audit(args: &[String]) -> Result<()> {
     let f = parse_common(args)?;
-    let ph = load_phase4(&f.data, &f.model_dir, &f.tok_dir, f.ctx, 1)?;
+    let ph = load_phase4(&f.data, &f.model_dir, &f.tok_dir, f.ctx, 1, f.dtype)?;
     let ctx = &ph.rows[..f.ctx];
     let xs = kronos_core::data::stamps(ctx, &ph.dev)?.unsqueeze(0);
     let v = kronos_core::data::values(ctx, &ph.dev)?;
@@ -572,7 +582,7 @@ fn cmd_precision(args: &[String]) -> Result<()> {
         let mu2 = &mu * &mu;
         let std = v.multiply(&v).f_sum_dim_intlist(vec![0], true, None)? / (f.ctx as f64);
         let std = (std - mu2).f_sqrt()?;
-        let eps = Tensor::from_slice(&[1e-5f32]);
+        let eps = Tensor::from_slice(&[1e-5f32]).to_device(dev);
         let normed = (&v - &mu) / (&std + &eps);
         let normed = normed.f_clamp_min(-5.0)?.f_clamp_max(5.0)?;
         let xs = kronos_core::data::stamps(&rows[..f.ctx], &dev)?.unsqueeze(0);
