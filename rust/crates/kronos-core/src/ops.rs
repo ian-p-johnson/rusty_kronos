@@ -32,17 +32,144 @@ pub fn embedding_lookup(weight: &Tensor, ids: &Tensor) -> Result<Tensor> {
 /// Candle's `matmul` requires equal rank on both sides, so we flatten the
 /// leading two dims, do the 2-D product, and restore. This is the single most
 /// frequently called operation in the model.
-#[inline]
+use cudarc::cublas::CudaBlas;
+
 pub fn linear(x: &Tensor, w: &Tensor, bias: Option<&Tensor>) -> Result<Tensor> {
     let dims = x.dims().to_vec();
     let (b, l, din) = (dims[0], dims[1], dims[2]);
     let dout = w.dim(0)?;
     let x2 = x.reshape((b * l, din))?;
-    let y2 = x2.matmul(&w.t()?)?;
+    let y2 = match gemm_fast(&x2, w) {
+        Ok(y) => y,
+        Err(_) => x2.matmul(&w.t()?)?, // non-contiguous / unusual shapes
+    };
     let y = y2.reshape((b, l, dout))?;
     match bias {
         Some(bias) => y.broadcast_add(bias),
         None => Ok(y),
+    }
+}
+
+/// cublas classic Sgemm `(M,K) @ (K,N)^T` in torch-linear form, with an
+/// explicit `CUBLAS_GEMM_DEFAULT` algo.
+///
+/// Reason for bypassing Tensor::matmul: candle passes the deprecated
+/// `CUBLAS_GEMM_DEFAULT_TENSOR_OP` algo alongside true-fp32 compute; on the
+/// drivers here that lands a slow kernel — 1.23 ms for a (6320,512) @
+/// [512,1024] FFN call where the same cublas math with CUBLAS_GEMM_DEFAULT is
+/// 0.74 ms and torch's reference call is 0.54 ms (tests/lt_probe.rs).
+/// Outputs are bit-identical to candle's (Lt cross-check, 0 rel err).
+fn gemm_fast(x: &Tensor, w: &Tensor) -> Result<Tensor> {
+    use cc::result as cublas_result;
+    use cc::result::set_stream;
+    use cc::sys::{cublasComputeType_t, cublasGemmAlgo_t, cublasOperation_t, cudaDataType_t};
+    use cudarc::cublas as cc;
+
+    use cudarc::driver::{DevicePtr, DevicePtrMut};
+
+    if x.dtype() != DType::F32
+        || !x.is_contiguous()
+        || !w.is_contiguous()
+        || !matches!(w.device(), Device::Cuda(_))
+        || !matches!(x.device(), Device::Cuda(_))
+    {
+        return Err(candle_core::Error::Msg("gemm_fast unsupported".into()));
+    }
+    let (m, k) = x.dims2()?; // x: [b*l, k]
+    let (dk, n) = w.dims2()?; // w: [k, n]
+    if dk != k {
+        return Err(candle_core::Error::Msg("gemm_fast mismatch".into()));
+    }
+    let dev = match x.device() {
+        Device::Cuda(d) => d.clone(),
+        _ => unreachable!(),
+    };
+
+    // row-major x @ w^T in cublas col-major terms:
+    //   C_col (n, m) = opA(W_col (k,n), T) * opB(X_col (k,m), N), ldc = n
+    let blas = blas_for(&dev)?;
+    let mut out: cudarc::driver::CudaSlice<f32> = unsafe { dev.alloc(m * n)? };
+    let (a_slice, _al) = w.storage_and_layout(); // A = W
+    let (b_slice, _bl) = x.storage_and_layout(); // B = X
+    let a_ptr = f32_slice(&a_slice)?.clone();
+    let b_ptr = f32_slice(&b_slice)?.clone();
+    let alpha: f32 = 1.0;
+    let beta: f32 = 0.0;
+    {
+        let stream = dev.cuda_stream();
+        let (ap, _gap) = a_ptr.device_ptr(&stream);
+        let (bp, _gbp) = b_ptr.device_ptr(&stream);
+        let (cp, _gcp) = out.device_ptr_mut(&stream);
+        unsafe {
+            // bind the call to candle's stream (raw cublas calls execute on
+            // the handle's current stream; unbound they land on the legacy
+            // NULL stream = full-device sync per call)
+            set_stream(*blas.handle(), stream.cu_stream() as *mut _)
+                .map_err(|e| candle_core::Error::msg(format!("cublas bind: {e:?}")))?;
+            cublas_result::gemm_strided_batched_ex(
+                *blas.handle(),
+                cublasOperation_t::CUBLAS_OP_T,
+                cublasOperation_t::CUBLAS_OP_N,
+                n as i32,
+                m as i32,
+                k as i32,
+                &alpha as *const f32 as *const _,
+                ap as *const _,
+                cudaDataType_t::CUDA_R_32F,
+                k as i32,
+                0,
+                bp as *const _,
+                cudaDataType_t::CUDA_R_32F,
+                k as i32,
+                0,
+                &beta as *const f32 as *const _,
+                cp as *mut _,
+                cudaDataType_t::CUDA_R_32F,
+                n as i32,
+                0,
+                1,
+                cublasComputeType_t::CUBLAS_COMPUTE_32F,
+                cublasGemmAlgo_t::CUBLAS_GEMM_DEFAULT,
+            )
+            .map_err(|e| candle_core::Error::msg(format!("cublas sgemm: {e:?}")))?;
+        }
+    }
+    let storage = <f32 as candle_core::cuda_backend::CudaDType>::wrap_cuda_slice(out, dev.clone());
+    Ok(Tensor::from_storage(
+        candle_core::Storage::Cuda(storage),
+        (m, n),
+        candle_core::op::BackpropOp::none(),
+        true,
+    ))
+}
+
+type BlasTable = std::sync::Mutex<Vec<(usize, std::sync::Arc<cudarc::cublas::CudaBlas>)>>;
+static SBLAS: std::sync::OnceLock<BlasTable> = std::sync::OnceLock::new();
+
+fn blas_for(
+    dev: &candle_core::cuda_backend::CudaDevice,
+) -> Result<std::sync::Arc<cudarc::cublas::CudaBlas>> {
+    let key = dev as *const _ as usize;
+    let cells = SBLAS.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    let mut g = cells.lock().unwrap();
+    if let Some((_, b)) = g.iter().find(|(i, _)| *i == key) {
+        return Ok(b.clone());
+    }
+    let b = CudaBlas::new(dev.cuda_stream())
+        .map_err(|e| candle_core::Error::msg(format!("cublas handle: {e:?}")))?;
+    g.push((key, std::sync::Arc::new(b)));
+    let (_, b) = g.iter().find(|(i, _)| *i == key).unwrap();
+    Ok(b.clone())
+}
+
+/// Device memory borrow of f32 CUDA storage.
+fn f32_slice(storage: &candle_core::Storage) -> Result<&cudarc::driver::CudaSlice<f32>> {
+    match storage {
+        candle_core::Storage::Cuda(cs) => match &cs.slice {
+            candle_core::cuda_backend::CudaStorageSlice::F32(v) => Ok(v),
+            _ => Err(candle_core::Error::Msg("not f32 slice".into())),
+        },
+        _ => Err(candle_core::Error::Msg("not cuda storage".into())),
     }
 }
 

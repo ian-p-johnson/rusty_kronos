@@ -156,6 +156,7 @@ pub fn generate(
     let full_stamp = Tensor::cat(&[&x_stamp, &y_stamp], 1)?.contiguous()?;
     let t_loop = std::time::Instant::now();
     let (mut t_samp, mut t_rest_total) = (0.0f64, 0.0f64);
+    let (mut t_s1, mut t_s2) = (0.0f64, 0.0f64);
 
     // Ring buffer: the initial window holds only the LAST min(T, max_ctx) tokens.
     let buffer_len = initial.min(p.max_context);
@@ -175,6 +176,7 @@ pub fn generate(
         let ts = std::time::Instant::now();
         let d1 = model.decode_s1(&s1, &s2, &stamp)?;
         t_rest_total += ts.elapsed().as_secs_f64();
+        t_s1 += ts.elapsed().as_secs_f64();
         let s1_last = d1.s1_logits.narrow(1, window_len - 1, 1)?.squeeze(1)?;
         let trace = std::env::var("KRONOS_TRACE_TOKENS").is_ok();
         if trace {
@@ -193,6 +195,7 @@ pub fn generate(
         let ts = std::time::Instant::now();
         let s2_logits = model.decode_s2(&d1.context, &sample_pre)?;
         t_rest_total += ts.elapsed().as_secs_f64();
+        t_s2 += ts.elapsed().as_secs_f64();
         let s2_last = s2_logits.narrow(1, window_len - 1, 1)?.squeeze(1)?;
         if trace {
             let m = top2_margin(&s2_last)?;
@@ -222,10 +225,12 @@ pub fn generate(
     }
 
     if profile {
+        let _ = t_rest_total;
         eprintln!(
-            "[profile] AR loop  {:.1} ms  |  decode_s1+s2 {:.1} ms  |  sampling {:.1} ms",
+            "[profile] AR loop  {:.1} ms  |  decode_s1 {:.1}  decode_s2 {:.1}  |  sampling {:.1} ms",
             t_loop.elapsed().as_secs_f64() * 1e3,
-            t_rest_total * 1e3,
+            t_s1 * 1e3,
+            t_s2 * 1e3,
             t_samp * 1e3
         );
         let [a, b, c, d, e, f, g] = crate::ops::prof_take();
