@@ -1,6 +1,6 @@
 # Porting Kronos from Python/PyTorch to Rust (or Mojo) + GPU
 
-**Status:** assessment + staged plan
+**Status:** **implemented.** Phases 0–6 of the plan below are built and green; the port runs on `tch`/libtorch with no Python runtime. **Current head: `afeae9d`.** Read **§11 (implementation log)** for what actually shipped, the substrate decision, build recipe, live gate status and the one open performance question. Sections 1–10 are the original assessment and are kept as written; where later work superseded a recommendation it is flagged inline.
 **Scope of study:** this repo at `67b630e`, plus `2508.02739v1.pdf` (AAAI 2026, "Kronos: A Foundation Model for the Language of Financial Markets")
 **Measurements:** taken on the local machine (NVIDIA GeForce RTX 5070 Ti **Laptop**, 46 SMs, CC 12.0, 12 GB, torch 2.11.0+cu128). Projections to desktop RTX 5070 Ti / RTX 3090 are labelled as such.
 
@@ -98,6 +98,8 @@ Everything happens inside `KronosPredictor.predict` → `KronosPredictor.generat
 
 ### 4.1 What is easy
 
+> **Superseded (Phase 6).** The `candle-core` weight-loading assumption held for Phases 1–5 and was then retired: the final engine uses `tch::Tensor::read_safetensors`. The rest of this section still stands.
+
 - **Weight loading.** Weights are `safetensors` + `config.json` on the HF Hub. Rust's `candle-core` has a native `VarBuilder::from_mmaped_safetensors` + `hf-hub` client — a direct, zero-friction match. `config.json` is 11 scalar keys per model.
 - **The architecture.** `Linear`, `Embedding`, `RMSNorm`, `SiLU`, RoPE, `scaled_dot_product_attention` — all first-class in `candle-core`/`cudarc` (cuBLAS, cuBLASLt, cuDNN) or trivially hand-written.
 - **Attention.** `F.scaled_dot_product_attention` with `is_causal=True` → cuDNN/cuBLAS or a FlashAttention kernel. No masking subtleties: the only mask used is the optional `key_padding_mask`, which **`auto_regressive_inference` never passes**.
@@ -148,6 +150,8 @@ ffn        3 × 2·(B·512)·512·1024
 ---
 
 ## 5. Rust vs Mojo
+
+> **Outcome (recorded for the record).** Rust won, as recommended — but not via `candle`. The substrate is `tch` (libtorch bindings); see §11.2. Mojo was never spiked, because the §7 Phase-5 finding (candle's *kernels*, not the language, were the ceiling) made the Rust-plus-libtorch route strictly better than anything a Mojo kernel spike could have delivered. The `cutile-rs`/`cuda-oxide` route was evaluated and rejected: they are NVIDIA's experimental Rust kernel DSLs — excellent for hand-written kernels, useless as a drop-in for ATen's tuned GEMM/SDPA/softmax library.
 
 Both are viable. They are **not** equivalent, and the deciding factor is not raw kernel speed.
 
@@ -443,3 +447,125 @@ fp16 → s1 4.745e-04, s2 6.988e-04, 0 % top-1 flip. bf16 → s1 3.632e-03, s2 4
 **Uncertainty on projections.** Desktop-vs-laptop scaling is derived from SM count × clock, not measured — budget **±30 %**. The one assumption worth re-checking on real hardware is the achieved GEMM fraction (~81 % at B=1, ~49 % at B=10 of bf16 peak); if the desktop part sustains a higher fraction, Phase 5 items 1–3 will pay less than estimated and item 5 will pay more.
 
 **Reproducing these numbers.** The benchmark scripts used for this assessment (`bench_kronos.py`, `bench_kv.py`, `bench_opt.py`, `prof_kernels.py`, `verify_parity.py`, `prec3.py`, `kvcache_proof.py`) are small and self-contained; fold them into `bench/` as the Phase 0 deliverable.
+
+---
+
+## 11. Implementation log (live status)
+
+Everything below is the *as-built* record. §1–10 are the plan; this is what happened.
+
+### 11.1 Commit map
+
+One commit per phase, linear history, local fork `ian-p-johnson/rusty_kronos`, branch `master`. Nothing pushed.
+
+| Commit | Phase | Content |
+|---|---|---|
+| `4c0fccf` | 0 | Freeze the PyTorch oracle: golden-CSV generation, probe dumps, weight manifest, benchmark harness (`parity/`), `frozen.lock` + `check_frozen.sh` |
+| `4d73673` | 1 | Cargo workspace, `KronosConfig` (11 scalars, serde), **strict** safetensors loader (fails loudly on any missing/unexpected key), CLI `info`/`manifest` |
+| `b9be690`, `46afc7b`, `6516d1f` | 2a/2b | Low-level ops with per-op parity tests; then the full model maths (RMSNorm, RoPE, SwiGLU, attention, embeddings, dual head, dependency layer) with per-stage parity on small/base/mini |
+| `a5ee1f1` | 4 | AR ring-buffer loop, `top_k`/`top_p` sampler, golden gate, fp16 divergence report |
+| `2f6a4f8` | 5.1 | Batch-throughput diagnostics; sorted-space sampler (no scatter); causal-mask cache — 21.4 s → ~14.5–16.3 s |
+| `7de8342` | 5.2 | Custom online-softmax attention kernel via Candle's custom-CUDA API (`.cu` → NVRTC → PTX): 8.3 ms → 2.4 ms per attention call |
+| `2ad77fd` | 5.3 | GEMM-algo investigation, per-step/per-op probes, bit-identical GEMM recipe, step anatomy |
+| `afeae9d` | 6 | **Substrate swap: candle → `tch`/libtorch**, whole engine re-expressed; all gates green |
+
+**Phase-numbering note.** The commit stream reuses the numbers in §7 but not the boundaries: §7's "Phase 5 — performance engineering" was executed as commits `2f6a4f8`/`7de8342`/`2ad77fd` (all of the fusion work except CUDA graphs and a persistent megakernel), and this repo's "Phase 6" is the **substrate swap**, which §7 does not have a phase for at all. §7's own Phase 6 — the axum server, request batching, OOM degradation — has **not** been started and is still described correctly in §7 and §11.7.
+
+Code size: **4,505 lines** of Rust across `kronos-core` (3,515) and `kronos-cli` (990), plus ~1,000 lines of integration tests.
+
+### 11.2 The substrate decision (the one real fork in the road)
+
+Phase 5 established the ceiling precisely, and it was not the language:
+
+- Every *isolated* op in the candle engine was **slower than the same op in Python**, sometimes by 3–6× (softmax 4.7 ms vs 0.9 ms; an untuned `mul` at 1.6 ms vs 0.04 ms).
+- One GEMM was **10× off peak** because candle silently routed through a deprecated cuBLAS algo.
+- Writing kernels by hand *worked* — the fused attention kernel was a 3.5× win — but each kernel is days of work, and there are hundreds of `mul`/`add`/`reshape` calls per step.
+
+So the question became: can Rust drive **the exact libtorch the oracle uses**, with no Python? Answer: yes — `tch` 0.24 + `torch-sys`, linking the pip torch 2.11.0 installation. This preserves every tuned ATen kernel (cuBLAS/cuBLASLt GEMMs, fused RMSNorm, mem-efficient/flash SDPA, cumsum/softmax/sort chains) while keeping all model logic, the sampler, the CLI and the parity harness in Rust. It is a *substrate* change, not a cheat: the arithmetic still has to be written, and it still has to hit the frozen oracle.
+
+Rejected alternatives: `burn`+`cubecl` (no mature SDPA/quantizer story, would rewrite the kernels by hand); `candle`+`cuda-oxide`/`cutile` (authoring DSLs, no library kernels — the 5.1/5.2 data above says hand-writing is the slow path).
+
+### 11.3 Build recipe (this bit is fiddly; don't rediscover it)
+
+```bash
+# 1. libtorch = the pip torch 2.11.0 already used for the oracle
+export T=/tmp/opencode/kronosenv/lib/python3.12/site-packages
+export LIBTORCH=$T/torch
+export LD_LIBRARY_PATH="$T/torch/lib:$T/nvidia/{cublas,cudnn,cudart,nccl,cusparse,cufft,cusolver,nvtx,nvjitlink,curand,nvshmem}/lib:$LD_LIBRARY_PATH"
+source /tmp/opencode/tchspike/env.sh   # all of the above, in one line
+```
+
+- **`tch = "0.24"` exactly.** torch-sys 0.24 pins torch 2.11.0 (bit-identical to the oracle env). 0.26 targets a newer torch and fails against the 2.11 headers.
+- No feature flags: `tch` has no `cuda` feature — libtorch CUDA is picked up from `LIBTORCH`.
+- Both `build.rs` files re-emit `-Wl,--no-as-needed -Wl,-ltorch_cuda -Wl,-rpath,$LIBTORCH/lib`. Without this the linker drops `libtorch_cuda.so` (nothing in the Rust code references its symbols) and ATen's CUDA dispatch comes up unregistered.
+- **`source` the env before every cargo command**, or `torch-sys` builds against the wrong ABI.
+
+### 11.4 Porting notes — the traps that actually cost time
+
+1. **dtype is not `DType`.** Candle's `DType::U32` has no torch analogue; token ids are `Kind::Int` (i64) and the packed-token pipeline widens to i64 when it walks embedding tables.
+2. **Implicit-conversion rules that saved the port.** `f_multiply_scalar`, `f_add_scalar` and friends accept `impl Into<Scalar>`, so `Tensor + &Tensor` (candle idiom) becomes `&a + &b` with no `f_add` wrapper.
+3. **Scalars must live on the device.** `Tensor::from_slice(&[1e-5])` is a CPU tensor; `(&std + &eps)` then dies with *"two devices, cuda:0 and cpu"*. Build it with `.to_device(dev)`.
+4. **2-D tensors will not flatten implicitly.** `try_into::<Vec<f32>>()` on a `[1, 1]` errors — add `.reshape([-1])`.
+5. **A missing `?` can still compile.** Every ported op that can touch the device returns `Result<Tensor>`; dropping the `?` gives you a `Result`, and because `Result` *also* has `map_err`, the compiler stays quiet and then fails a line later with *"no method named `unsqueeze` found for struct `Result`"*. Prefer fixing the call site over casting.
+6. **The final-decode window is `min(total, max_context)`, not `max_context`.** Narrowing by `max_context` unconditionally crashes every ctx256/pred8 golden with `start (0) + length (512) exceeds dimension size (264)` — the ring buffer never filled because `initial + pred_len < max_context`.
+7. **Do not carry candle's literal dim numbers across.** `argmax(dim)` → `f_argmax(-1, false)` (last axis), `to_vec1::<u32>()` → `to_kind(Kind::Int)` + `try_into()`. A hard-coded `f_argmax(2, …)` on a `[1, 1024]` tensor only fails at runtime, with *"dimension index 2 out of range"*, and only on the code path that hits it.
+8. **The sampler audit's analytic p must be computed at the sampling temperature.** Softmaxing the raw logits while drawing at `T=0.6` reports 0.1028 against an empirical 0.2148 and fails a correct sampler. Softmax `logits / T`.
+9. **Audit the parity of the *audit*, not just the model.** Every one of the bugs above was found by a gate, never by inspection.
+10. **Retiring candle is a real deletion, not a feature flag.** `flash.rs`, `flash_attn.ptx` and the cuBLASLt GEMM wrappers went; `rust/cuda/flash_attn.cu` survives only as history under `7de8342`.
+
+### 11.5 Gate status at `afeae9d` — all green
+
+| Gate | Command | Status |
+|---|---|---|
+| Build (release) | `cargo build --release` | clean, 0 warnings |
+| Lints | `cargo clippy --all-targets` | 0 warnings |
+| Unit tests | `cargo test --release --lib` | 30 passed |
+| Integration suites | `cargo test --release --tests` | phase4 (8), bits (2), decode, linear, weights, gemm — all passed |
+| Oracle frozen | `./parity/check_frozen.sh` | `model/` and `tests/` byte-identical to `frozen.lock` |
+| Golden CSVs (tests) | `phase4` | 6/6 pass at `rtol=1e-5` — worst rel err per model/ctx: small 6.14e-7 (ctx256) / 4.76e-7 (ctx512), base 6.14e-7 / 2.45e-7, mini 3.55e-7 / 1.83e-7 |
+| Golden CSVs (CLI spot-check) | `kronos-cli predict --golden` | matches the above through the real CSV→forecast→de-normalise path |
+| Sampler audit | `kronos-cli sampler-audit` | 3/3 assertions pass |
+
+Deterministic (greedy) parity is bitwise reproducible run-to-run, as in Python.
+
+### 11.6 Performance status — measured, with the caveat that matters
+
+**The measurement protocol for anything that goes in a report:** liaise with the user first (they must be able to stop whatever else is running on the laptop), then take the *minimum* of ≥3 iterations with a cooldown, and record clocks/temperature. Consumer GPUs throttle under sustained load, and the Python baseline was taken the same way (`parity/baseline_pytorch.json`: min-of-3, 10 s cooldown).
+
+**Liaised per-op comparison, `tch` vs Python, Kronos-small fp32** (this is the trustworthy one):
+
+| Op | shape | Python | Rust (`tch`) |
+|---|---|---|---|
+| linear | GEMM in the model's own shapes | 0.54 ms | 0.68 ms |
+| rmsnorm | fused | 0.072 ms | **0.030 ms** |
+| softmax | `[10, 4274]` | 0.004 ms | 0.004 ms |
+| softmax | `[10, 2²¹]` | 0.91 ms | 0.91 ms |
+| **sdpa** | `[10, 8, 512, 64]` causal | 0.399 ms | 0.403 ms |
+
+So: SDPA is exactly at parity (and is now the fused mem-efficient kernel in fp32, FlashAttention in fp16 — the custom candle kernel it replaced took 2.4 ms), softmax is at parity, RMSNorm is 2.4× *faster* than Python's in-line call, and only the linear GEMM is behind (0.68 vs 0.54 ms), which is worth a second look but is not a 3× problem.
+
+**End-to-end is still unexplained, and I am not going to pretend otherwise.** Kronos-small, ctx512, pred120, B=10, fp32, against the frozen baseline (`parity/baseline_pytorch.json`, min-of-3 with 10 s cooldown):
+
+| Engine | AR loop | per step |
+|---|---|---|
+| PyTorch oracle (liaised, min-of-3) | 3,260 ms | **39.4 ms** |
+| Rust candle | ~14,200 ms | ~118 ms |
+| Rust `tch` | ~15,800 ms | ~131 ms |
+
+Reference points from the same frozen file: small/512/48/B=10 = **1,940 ms**, mini/512/120/B=10 = **877 ms** (the cheapest large-ish target).
+
+The substrate swap did **not** move end-to-end, even though it moved every isolated op to parity. Three candidate explanations, none yet tested:
+
+1. **The E2E runs above were not liaised.** They were taken on a contended laptop. The per-op table *was* liaised and came out green. This is the cheapest thing to rule out and the most likely explanation — if a 4× E2E gap is real it cannot hide behind ops that each measure at parity.
+2. **Launch-bound rather than device-bound.** `decode_s1` is ~350 small aten calls; if per-call CPU dispatch through the tch FFI costs ~100 µs, that is 35 ms of pure CPU with the GPU idle. Distinguishable cheaply: if per-step time is the same at B=1 and B=10, we are launch-bound; if it scales ~10×, we are device-bound. (`nvidia-smi dmon` during the run settles it outright.)
+3. **Op-count inflation** — extra `.contiguous()` / `reshape` / `transpose` traffic that Python does not pay (the attention path materialises 3 contiguous copies per layer that Python's strided SDPA accepts as-is).
+
+**Next step, in order:** liaised E2E fp32 run of small/512/120/B=10 → if the gap survives a quiet machine, run the B=1 vs B=10 scaling test with `nvidia-smi dmon`, then attack whichever of (2)/(3) it names. Then the fp16 run, which is the more interesting number anyway (§6.4 predicts ~3× from precision alone; an earlier session measured the oracle's own bf16 path at ~1.1 s for this config, though that row is *not* in the frozen baseline and should be re-taken).
+
+### 11.7 What is left
+
+- **[blocking]** Establish whether the E2E gap is real (§11.6) — one liaised run answers it.
+- Port `cuTile`/fused-kernel ideas onto `tch` only if (2)/(3) come back clean, i.e. only if the GPU really is busy.
+- The tokenizer's causal decode **does** admit a prefix KV cache (§4.3's exception): ~3–4 ms per forecast, and it is valid, but it changes numerics slightly and needs its own parity decision.
+- Phase 7 of the original plan — the axum server, request batching, graceful OOM degradation — is untouched. Everything above is library + CLI.
+- Training stays in Python (§5.1, §7.7). Not revisited.
