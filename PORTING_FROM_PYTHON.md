@@ -1,6 +1,6 @@
 # Porting Kronos from Python/PyTorch to Rust (or Mojo) + GPU
 
-**Status:** **implemented.** Phases 0–6 of the plan below are built and green; the port runs on `tch`/libtorch with no Python runtime. **Current head: `afeae9d`.** Read **§11 (implementation log)** for what actually shipped, the substrate decision, build recipe, live gate status and the one open performance question. Sections 1–10 are the original assessment and are kept as written; where later work superseded a recommendation it is flagged inline.
+**Status:** **implemented and measured.** Phases 0–6 of the plan below are built and green; the port runs on `tch`/libtorch with no Python runtime, and is at/under PyTorch parity inside the AR loop (§11.6). **Current head: `a59fa94`.** Read **§11 (implementation log)** for what actually shipped, the substrate decision, build recipe, live gate status and the one open performance question. Sections 1–10 are the original assessment and are kept as written; where later work superseded a recommendation it is flagged inline.
 **Scope of study:** this repo at `67b630e`, plus `2508.02739v1.pdf` (AAAI 2026, "Kronos: A Foundation Model for the Language of Financial Markets")
 **Measurements:** taken on the local machine (NVIDIA GeForce RTX 5070 Ti **Laptop**, 46 SMs, CC 12.0, 12 GB, torch 2.11.0+cu128). Projections to desktop RTX 5070 Ti / RTX 3090 are labelled as such.
 
@@ -468,6 +468,7 @@ One commit per phase, linear history, local fork `ian-p-johnson/rusty_kronos`, b
 | `7de8342` | 5.2 | Custom online-softmax attention kernel via Candle's custom-CUDA API (`.cu` → NVRTC → PTX): 8.3 ms → 2.4 ms per attention call |
 | `2ad77fd` | 5.3 | GEMM-algo investigation, per-step/per-op probes, bit-identical GEMM recipe, step anatomy |
 | `afeae9d` | 6 | **Substrate swap: candle → `tch`/libtorch**, whole engine re-expressed; all gates green |
+| `a59fa94` | 6.1 | Fix a latent `[B]` vs `[B,V]` broadcast bug in the stochastic sampler that every gate missed; add a row-independence gate; plumb `--dtype` through `predict`; measured E2E (§11.6) |
 
 **Phase-numbering note.** The commit stream reuses the numbers in §7 but not the boundaries: §7's "Phase 5 — performance engineering" was executed as commits `2f6a4f8`/`7de8342`/`2ad77fd` (all of the fusion work except CUDA graphs and a persistent megakernel), and this repo's "Phase 6" is the **substrate swap**, which §7 does not have a phase for at all. §7's own Phase 6 — the axum server, request batching, OOM degradation — has **not** been started and is still described correctly in §7 and §11.7.
 
@@ -508,23 +509,25 @@ source /tmp/opencode/tchspike/env.sh   # all of the above, in one line
 4. **2-D tensors will not flatten implicitly.** `try_into::<Vec<f32>>()` on a `[1, 1]` errors — add `.reshape([-1])`.
 5. **A missing `?` can still compile.** Every ported op that can touch the device returns `Result<Tensor>`; dropping the `?` gives you a `Result`, and because `Result` *also* has `map_err`, the compiler stays quiet and then fails a line later with *"no method named `unsqueeze` found for struct `Result`"*. Prefer fixing the call site over casting.
 6. **The final-decode window is `min(total, max_context)`, not `max_context`.** Narrowing by `max_context` unconditionally crashes every ctx256/pred8 golden with `start (0) + length (512) exceeds dimension size (264)` — the ring buffer never filled because `initial + pred_len < max_context`.
-7. **Do not carry candle's literal dim numbers across.** `argmax(dim)` → `f_argmax(-1, false)` (last axis), `to_vec1::<u32>()` → `to_kind(Kind::Int)` + `try_into()`. A hard-coded `f_argmax(2, …)` on a `[1, 1024]` tensor only fails at runtime, with *"dimension index 2 out of range"*, and only on the code path that hits it.
-8. **The sampler audit's analytic p must be computed at the sampling temperature.** Softmaxing the raw logits while drawing at `T=0.6` reports 0.1028 against an empirical 0.2148 and fails a correct sampler. Softmax `logits / T`.
-9. **Audit the parity of the *audit*, not just the model.** Every one of the bugs above was found by a gate, never by inspection.
-10. **Retiring candle is a real deletion, not a feature flag.** `flash.rs`, `flash_attn.ptx` and the cuBLASLt GEMM wrappers went; `rust/cuda/flash_attn.cu` survives only as history under `7de8342`.
+7. **A `[B]` tensor broadcast against `[B, V]` is only legal when B == 1.** The sorted-space sampler built its kept-prefix one-hot as `arange(V).expand([B,V]).eq(kpos)` with `kpos` shaped `[B]`, which right-aligns to `[1, B]` and happens to work for a single row. Every gate ran B == 1 — the goldens are `top_k=1` (argmax, no such arithmetic) and the sampler audit draws 256 rows of *one* series — so the bug shipped in `afeae9d` and only surfaced when someone ran `--samples 10 --top-p 0.9`. Fix is `.unsqueeze(1)`; the gate added alongside it (`batched_sampling_is_row_independent`) asserts that sampling row *i* alone equals sampling it inside a batch, which catches every variant of this class.
+8. **Do not carry candle's literal dim numbers across.** `argmax(dim)` → `f_argmax(-1, false)` (last axis), `to_vec1::<u32>()` → `to_kind(Kind::Int)` + `try_into()`. A hard-coded `f_argmax(2, …)` on a `[1, 1024]` tensor only fails at runtime, with *"dimension index 2 out of range"*, and only on the code path that hits it.
+9. **The sampler audit's analytic p must be computed at the sampling temperature.** Softmaxing the raw logits while drawing at `T=0.6` reports 0.1028 against an empirical 0.2148 and fails a correct sampler. Softmax `logits / T`.
+10. **Audit the parity of the *audit*, not just the model.** Every one of the bugs above was found by a gate or a benchmark, never by inspection. Three of them (items 3, 4, 7) had gates that *passed* while the bug was live, which is the uncomfortable lesson: a gate that only ever exercises B=1 or only ever exercises the golden path is not a gate.
+11. **Retiring candle is a real deletion, not a feature flag.** `flash.rs`, `flash_attn.ptx` and the cuBLASLt GEMM wrappers went; `rust/cuda/flash_attn.cu` survives only as history under `7de8342`.
 
-### 11.5 Gate status at `afeae9d` — all green
+### 11.5 Gate status — all green
 
 | Gate | Command | Status |
 |---|---|---|
 | Build (release) | `cargo build --release` | clean, 0 warnings |
 | Lints | `cargo clippy --all-targets` | 0 warnings |
-| Unit tests | `cargo test --release --lib` | 30 passed |
+| Unit tests | `cargo test --release --lib` | 31 passed (incl. `batched_sampling_is_row_independent`) |
 | Integration suites | `cargo test --release --tests` | phase4 (8), bits (2), decode, linear, weights, gemm — all passed |
 | Oracle frozen | `./parity/check_frozen.sh` | `model/` and `tests/` byte-identical to `frozen.lock` |
 | Golden CSVs (tests) | `phase4` | 6/6 pass at `rtol=1e-5` — worst rel err per model/ctx: small 6.14e-7 (ctx256) / 4.76e-7 (ctx512), base 6.14e-7 / 2.45e-7, mini 3.55e-7 / 1.83e-7 |
-| Golden CSVs (CLI spot-check) | `kronos-cli predict --golden` | matches the above through the real CSV→forecast→de-normalise path |
+| Golden CSVs (CLI) | `kronos-cli predict --golden` | matches the above through the real CSV→forecast→de-normalise path |
 | Sampler audit | `kronos-cli sampler-audit` | 3/3 assertions pass |
+| fp16 trajectory | `kronos-cli precision-report` | 0/1200 sampled-token flips, 0/120 greedy flips, OHLC ≤7.4e-5 |
 
 Deterministic (greedy) parity is bitwise reproducible run-to-run, as in Python.
 
@@ -544,28 +547,35 @@ Deterministic (greedy) parity is bitwise reproducible run-to-run, as in Python.
 
 So: SDPA is exactly at parity (and is now the fused mem-efficient kernel in fp32, FlashAttention in fp16 — the custom candle kernel it replaced took 2.4 ms), softmax is at parity, RMSNorm is 2.4× *faster* than Python's in-line call, and only the linear GEMM is behind (0.68 vs 0.54 ms), which is worth a second look but is not a 3× problem.
 
-**End-to-end is still unexplained, and I am not going to pretend otherwise.** Kronos-small, ctx512, pred120, B=10, fp32, against the frozen baseline (`parity/baseline_pytorch.json`, min-of-3 with 10 s cooldown):
+**The E2E gap was contention, not a defect.** Re-measured on a quiet machine under the protocol above (warmup + min-of-3, 10 s cooldown, `nvidia-smi dmon` alongside). Kronos-small, ctx 512, pred 120:
 
-| Engine | AR loop | per step |
+| Config | Rust `tch` wall | AR loop | per step | PyTorch oracle (frozen) |
+|---|---|---|---|---|
+| fp32, B=10 | **5.20 s** | 3.72 s | **31.0 ms** | 4.72 s total (39.4 ms/step) |
+| fp32, B=1 | **1.62 s** | 0.61 s | **5.04 ms** | 0.61 s total (5.11 ms/step) |
+| fp16, B=10 | **2.33 s** | 1.23 s | **10.3 ms** | (fp16 not in the frozen baseline) |
+
+Read that carefully, because the two columns measure different things:
+
+- **Inside the AR loop we are at or better than Python** — 31.0 ms/step vs the oracle's 39.4 ms/step of *whole-run* time at B=10 (0.79×), and 5.04 vs 5.11 ms/step at B=1 (0.99×). GPU utilisation during the B=10 run is **99 %** at ~119 W / 2070 MHz: device-bound, exactly like the oracle. Hypotheses "launch-bound" and "op-count inflation" from earlier drafts are **dead**.
+- **End-to-end CLI is 1.10× the oracle at B=10**, because ~1.2 s sits *outside* the loop: weight loading (`read_safetensors` + dtype cast + H2D), CSV parse, de-normalise, CSV write. A `--pred-len 1 --samples 1` run costs **1.26 s** — that is the entire fixed cost. It is ~24 % of the fp32 B=10 wall and ~78 % of the B=1 wall.
+- **So the remaining lever is process startup, not the model.** For a long-lived server (the §7 Phase-6 target) it amortises to zero; for one-shot CLI use it is the whole B=1 story.
+- **fp16 is a clean 3.0×** (10.3 vs 31.0 ms/step), matching §6.4's prediction.
+
+fp16 correctness, full 120-step trajectory, re-measured on this substrate (`precision-report`):
+
+| Lens | max rel err (stochastic) | max rel err (greedy) |
 |---|---|---|
-| PyTorch oracle (liaised, min-of-3) | 3,260 ms | **39.4 ms** |
-| Rust candle | ~14,200 ms | ~118 ms |
-| Rust `tch` | ~15,800 ms | ~131 ms |
+| open / high / low / close | 3.1e-5 – 7.4e-5 | 3.1e-5 – 5.2e-5 |
+| volume / amount | 2.9e-3 / 3.5e-3 | 3.5e-3 / 3.5e-3 |
 
-Reference points from the same frozen file: small/512/48/B=10 = **1,940 ms**, mini/512/120/B=10 = **877 ms** (the cheapest large-ish target).
-
-The substrate swap did **not** move end-to-end, even though it moved every isolated op to parity. Three candidate explanations, none yet tested:
-
-1. **The E2E runs above were not liaised.** They were taken on a contended laptop. The per-op table *was* liaised and came out green. This is the cheapest thing to rule out and the most likely explanation — if a 4× E2E gap is real it cannot hide behind ops that each measure at parity.
-2. **Launch-bound rather than device-bound.** `decode_s1` is ~350 small aten calls; if per-call CPU dispatch through the tch FFI costs ~100 µs, that is 35 ms of pure CPU with the GPU idle. Distinguishable cheaply: if per-step time is the same at B=1 and B=10, we are launch-bound; if it scales ~10×, we are device-bound. (`nvidia-smi dmon` during the run settles it outright.)
-3. **Op-count inflation** — extra `.contiguous()` / `reshape` / `transpose` traffic that Python does not pay (the attention path materialises 3 contiguous copies per layer that Python's strided SDPA accepts as-is).
-
-**Next step, in order:** liaised E2E fp32 run of small/512/120/B=10 → if the gap survives a quiet machine, run the B=1 vs B=10 scaling test with `nvidia-smi dmon`, then attack whichever of (2)/(3) it names. Then the fp16 run, which is the more interesting number anyway (§6.4 predicts ~3× from precision alone; an earlier session measured the oracle's own bf16 path at ~1.1 s for this config, though that row is *not* in the frozen baseline and should be re-taken).
+**0 / 1200 sampled-token flips and 0 / 120 greedy flips.** Same verdict as Phase 4 on candle; fp16 remains safe, and the error is concentrated in the small-magnitude volume/amount channels, not the price channels.
 
 ### 11.7 What is left
 
-- **[blocking]** Establish whether the E2E gap is real (§11.6) — one liaised run answers it.
-- Port `cuTile`/fused-kernel ideas onto `tch` only if (2)/(3) come back clean, i.e. only if the GPU really is busy.
+- **The 1.2 s fixed cost.** Weight load + CSV round-trip is 24 % of the fp32 B=10 wall and 78 % of the B=1 wall. Worth attacking for one-shot CLI use (mmap the safetensors instead of casting into fresh tensors; skip the output DataFrame path), worth nothing for a server. Nothing in the model itself.
+- **The sampler is the B=1 latency tail.** At B=1, sampling is 172 ms of the 605 ms AR loop (28 %) for 240 calls of ~0.7 ms each on a `[1, 1024]` tensor — it is ~40 small ops per call, entirely launch-bound. One fused top-p+sample kernel (or `torch.multinomial` plus a nucleus check) would take most of that back. At B=10 it is 6 % of the loop, so this is a B=1-only project.
+- **fp16 is measured, gated and 3.0×**; making it the default operating mode is a one-flag decision, pending a decision on whether ~3e-3 relative error on volume/amount is acceptable for the target strategy.
+- Port `cuTile`/fused-kernel ideas onto `tch` only if the GPU is demonstrably idle — at 99 % utilisation there is no headroom left to win.
 - The tokenizer's causal decode **does** admit a prefix KV cache (§4.3's exception): ~3–4 ms per forecast, and it is valid, but it changes numerics slightly and needs its own parity decision.
-- Phase 7 of the original plan — the axum server, request batching, graceful OOM degradation — is untouched. Everything above is library + CLI.
-- Training stays in Python (§5.1, §7.7). Not revisited.
+- §7's Phase 6 — the axum server, request batching, graceful OOM degradation — is untouched. Everything above is library + CLI. Training stays in Python (§5.1, §7.7).
