@@ -6,9 +6,10 @@ use crate::config::PredictorConfig;
 use crate::embed::{DualHead, HierarchicalEmbedding, TemporalEmbedding};
 #[allow(unused_imports)]
 use crate::ops::linear;
+use crate::ops::Result;
 use crate::ops::{embedding_lookup, rms_norm};
 use crate::weights::Weights;
-use candle_core::{DType, Result, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// `(s1_logits, context)` — the two halves of `decode_s1`.
 pub struct DecodeS1 {
@@ -38,8 +39,8 @@ impl Kronos {
         w: &Weights,
         cfg: &PredictorConfig,
         max_len: usize,
-        dev: &candle_core::Device,
-        dtype: DType,
+        dev: &Device,
+        dtype: Kind,
     ) -> Result<Self> {
         let geo = BlockGeometry::for_predictor(cfg, max_len);
         let rope = crate::ops::RotaryCache::new(geo.head_dim, max_len, dev, dtype)?;
@@ -56,7 +57,7 @@ impl Kronos {
             embedding: HierarchicalEmbedding::load(w, cfg)?,
             time_emb: TemporalEmbedding::load(w, cfg)?,
             transformer,
-            norm: w.get("norm.weight").clone(),
+            norm: w.get("norm.weight").shallow_clone(),
             head: DualHead::load(w)?,
             dep_layer: DependencyAwareLayer::load(w, cfg, max_len, dev, dtype)?,
             eps: 1e-5,
@@ -71,7 +72,7 @@ impl Kronos {
     /// `decode_s2` needs the latter as cross-attention key/value.
     pub fn decode_s1(&self, s1_ids: &Tensor, s2_ids: &Tensor, stamp: &Tensor) -> Result<DecodeS1> {
         let mut x = self.embedding.forward(s1_ids, s2_ids)?;
-        x = x.broadcast_add(&self.time_emb.forward(stamp)?)?;
+        x += self.time_emb.forward(stamp)?;
         // token_drop is nn.Dropout and is a no-op at eval (module.py:213)
         for blk in &self.transformer {
             x = blk.forward(&x)?;
@@ -97,10 +98,10 @@ impl Kronos {
         &self.cfg
     }
 
-    pub fn dtype(&self) -> DType {
+    pub fn dtype(&self) -> Kind {
         self.transformer
             .first()
             .map(|blk| blk.dtype_of_norm1())
-            .unwrap_or(DType::F32)
+            .unwrap_or(Kind::Float)
     }
 }

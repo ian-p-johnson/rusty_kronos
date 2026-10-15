@@ -4,9 +4,10 @@
 //! internally uses `[batch, heads, seq, head_dim]`.
 
 use crate::config::{BlockGeometry, PredictorConfig};
-use crate::ops::{linear, rms_norm, sdpa, RotaryCache};
+use crate::ops::Result;
+use crate::ops::{linear, rms_norm, sdpa, silu, RotaryCache};
 use crate::weights::Weights;
-use candle_core::{DType, Result, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// `FeedForward` (SwiGLU) — `model/module.py:271-281`.
 ///
@@ -21,31 +22,25 @@ pub struct FeedForward {
 impl FeedForward {
     fn load(prefix: &str, w: &Weights) -> Result<Self> {
         Ok(Self {
-            w1: w.get(&format!("{prefix}.w1.weight")).clone(),
-            w3: w.get(&format!("{prefix}.w3.weight")).clone(),
-            w2: w.get(&format!("{prefix}.w2.weight")).clone(),
+            w1: w.get(&format!("{prefix}.w1.weight")).shallow_clone(),
+            w3: w.get(&format!("{prefix}.w3.weight")).shallow_clone(),
+            w2: w.get(&format!("{prefix}.w2.weight")).shallow_clone(),
         })
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
-        let h1 = linear(x, &self.w1, None)?.contiguous()?;
-        let h3 = linear(x, &self.w3, None)?.contiguous()?;
-        let gated = candle_nn::ops::silu(&h1)?.broadcast_mul(&h3)?;
+        let h1 = linear(x, &self.w1, None)?;
+        let h3 = linear(x, &self.w3, None)?;
+        let gated = silu(&h1)? * h3;
         if std::env::var("KRONOS_TRACE").is_ok() {
-            let g0 = gated
-                .narrow(0, 0, 1)?
-                .narrow(1, 0, 1)?
-                .flatten_all()?
-                .to_dtype(candle_core::DType::F64)?
-                .to_vec1::<f64>()?;
+            let host = gated
+                .narrow(0, 0, 1)
+                .narrow(1, 0, 1)
+                .reshape([-1])
+                .to_device(tch::Device::Cpu)
+                .to_kind(Kind::Double);
+            let g0: Vec<f64> = (&host).try_into().unwrap_or_default();
             eprintln!("    [ffn] gated[0,0,:5]={:?}", &g0[..5.min(g0.len())]);
-            let out0 = linear(&gated, &self.w2, None)?
-                .narrow(0, 0, 1)?
-                .narrow(1, 0, 1)?
-                .flatten_all()?
-                .to_dtype(candle_core::DType::F64)?
-                .to_vec1::<f64>()?;
-            eprintln!("    [ffn] out[0,0,:5]={:?}", &out0[..5.min(out0.len())]);
         }
         linear(&gated, &self.w2, None)
     }
@@ -100,7 +95,7 @@ pub struct SelfAttention {
 
 impl SelfAttention {
     fn load(prefix: &str, w: &Weights, geo: BlockGeometry, rope: RotaryCache) -> Result<Self> {
-        let g = |s: &str| w.get(&format!("{prefix}.{s}")).clone();
+        let g = |s: &str| w.get(&format!("{prefix}.{s}")).shallow_clone();
         Ok(Self {
             q: g("q_proj.weight"),
             k: g("k_proj.weight"),
@@ -119,9 +114,10 @@ impl SelfAttention {
 
     /// `[B, L, d] -> [B, H, L, hd]`, i.e. `.view(B,L,H,hd).transpose(1,2)`.
     fn split_heads(&self, x: &Tensor) -> Result<Tensor> {
-        let (b, l, _) = x.dims3()?;
-        x.reshape((b, l, self.n_heads, self.head_dim))?
-            .permute((0, 2, 1, 3))
+        let size = x.size();
+        let (b, l, _) = (size[0], size[1], size[2]);
+        Ok(x.reshape([b, l, self.n_heads as i64, self.head_dim as i64])
+            .transpose(1, 2))
     }
 
     fn t0() -> std::time::Instant {
@@ -137,7 +133,8 @@ impl SelfAttention {
     #[allow(clippy::too_many_arguments)]
     pub fn forward_instrumented(&self, x: &Tensor, prof: bool) -> Result<Tensor> {
         use crate::ops::{linear, sdpa};
-        let (b, l, _) = x.dims3()?;
+        let size = x.size();
+        let (b, l, _) = (size[0], size[1], size[2]);
         let d = self.d_model;
         let h = self.n_heads;
         let hd = self.head_dim;
@@ -154,19 +151,19 @@ impl SelfAttention {
             0.0
         };
         let tb = SelfAttention::t0();
-        let (q, k, v) = qkv;
-        let q = q
-            .reshape((b, l, h, hd))?
-            .permute((0, 2, 1, 3))?
-            .contiguous()?;
-        let k = k
-            .reshape((b, l, h, hd))?
-            .permute((0, 2, 1, 3))?
-            .contiguous()?;
-        let v = v
-            .reshape((b, l, h, hd))?
-            .permute((0, 2, 1, 3))?
-            .contiguous()?;
+        let (q0, k0s, v0) = qkv;
+        let q = q0
+            .reshape([b, l, h as i64, hd as i64])
+            .transpose(1, 2)
+            .contiguous();
+        let k = k0s
+            .reshape([b, l, h as i64, hd as i64])
+            .transpose(1, 2)
+            .contiguous();
+        let v = v0
+            .reshape([b, l, h as i64, hd as i64])
+            .transpose(1, 2)
+            .contiguous();
         let splits_ms = if prof {
             SelfAttention::t0().duration_since(tb).as_secs_f64()
         } else {
@@ -187,10 +184,7 @@ impl SelfAttention {
             0.0
         };
         let te = SelfAttention::t0();
-        let ctx = ctx
-            .permute((0, 2, 1, 3))?
-            .contiguous()?
-            .reshape((b, l, d))?;
+        let ctx = ctx.transpose(1, 2).contiguous().reshape([b, l, d as i64]);
         let out = linear(&ctx, &self.o, Some(&self.ob))?;
         let out_ms = if prof {
             SelfAttention::t0().duration_since(te).as_secs_f64()
@@ -210,17 +204,18 @@ impl SelfAttention {
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
-        let (b, l, _) = x.dims3()?;
-        let q = self.split_heads(&linear(x, &self.q, Some(&self.qb))?.contiguous()?)?;
-        let k = self.split_heads(&linear(x, &self.k, Some(&self.kb))?.contiguous()?)?;
-        let v = self.split_heads(&linear(x, &self.v, Some(&self.vb))?.contiguous()?)?;
+        let size = x.size();
+        let (b, l) = (size[0], size[1]);
+        let q = self.split_heads(&linear(x, &self.q, Some(&self.qb))?.contiguous())?;
+        let k = self.split_heads(&linear(x, &self.k, Some(&self.kb))?.contiguous())?;
+        let v = self.split_heads(&linear(x, &self.v, Some(&self.vb))?.contiguous())?;
         let (q, k) = self.rope.apply(&q, &k)?;
         let ctx = sdpa(&q, &k, &v, true)?;
         // back to [B, L, d]
         let ctx = ctx
-            .permute((0, 2, 1, 3))?
-            .contiguous()?
-            .reshape((b, l, self.d_model))?;
+            .transpose(1, 2)
+            .contiguous()
+            .reshape([b, l, self.d_model as i64]);
         linear(&ctx, &self.o, Some(&self.ob))
     }
 }
@@ -237,17 +232,17 @@ pub struct TransformerBlock {
 impl TransformerBlock {
     pub fn load(prefix: &str, w: &Weights, geo: BlockGeometry, rope: RotaryCache) -> Result<Self> {
         Ok(Self {
-            norm1: w.get(&format!("{prefix}.norm1.weight")).clone(),
-            attn: SelfAttention::load(&format!("{prefix}.self_attn"), w, geo, rope)?,
-            norm2: w.get(&format!("{prefix}.norm2.weight")).clone(),
+            norm1: w.get(&format!("{prefix}.norm1.weight")).shallow_clone(),
+            attn: SelfAttention::load(&format!("{prefix}.self_attn"), w, geo, rope.clone())?,
+            norm2: w.get(&format!("{prefix}.norm2.weight")).shallow_clone(),
             ffn: FeedForward::load(&format!("{prefix}.ffn"), w)?,
             eps: 1e-5,
         })
     }
 
     /// Compute dtype, taken from a weight (all block weights share it).
-    pub fn dtype_of_norm1(&self) -> DType {
-        self.norm1.dtype()
+    pub fn dtype_of_norm1(&self) -> Kind {
+        self.norm1.kind()
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
@@ -257,9 +252,9 @@ impl TransformerBlock {
         } else {
             self.attn.forward(&n1)?
         };
-        let h = x.broadcast_add(&attn_out)?;
+        let h = x + attn_out;
         let n2 = rms_norm(&h, &self.norm2, self.eps)?;
-        h.broadcast_add(&self.ffn.forward(&n2)?)
+        Ok(h + self.ffn.forward(&n2)?)
     }
 }
 
@@ -291,10 +286,10 @@ impl CrossAttention {
         d_model: usize,
         n_heads: usize,
         max_len: usize,
-        dev: &candle_core::Device,
-        dtype: DType,
+        dev: &Device,
+        dtype: Kind,
     ) -> Result<Self> {
-        let g = |s: &str| w.get(&format!("{prefix}.{s}")).clone();
+        let g = |s: &str| w.get(&format!("{prefix}.{s}")).shallow_clone();
         let head_dim = d_model / n_heads;
         Ok(Self {
             q: g("q_proj.weight"),
@@ -312,9 +307,10 @@ impl CrossAttention {
     }
 
     fn split(&self, x: &Tensor) -> Result<Tensor> {
-        let (b, l, _) = x.dims3()?;
-        x.reshape((b, l, self.n_heads, self.head_dim))?
-            .permute((0, 2, 1, 3))
+        let size = x.size();
+        let (b, l, _) = (size[0], size[1], size[2]);
+        Ok(x.reshape([b, l, self.n_heads as i64, self.head_dim as i64])
+            .transpose(1, 2))
     }
 
     /// `query` is `[B, Lq, d]`, `key`/`value` are `[B, Lk, d]`; `Lq` may differ.
@@ -325,18 +321,16 @@ impl CrossAttention {
         value: &Tensor,
         causal: bool,
     ) -> Result<Tensor> {
-        let (b, lq, d) = query.dims3()?;
-        let q = self.split(&linear(query, &self.q, Some(&self.qb))?.contiguous()?)?;
-        let k = self.split(&linear(key, &self.k, Some(&self.kb))?.contiguous()?)?;
-        let v = self.split(&linear(value, &self.v, Some(&self.vb))?.contiguous()?)?;
+        let qsize = query.size();
+        let (b, lq, d) = (qsize[0], qsize[1], qsize[2]);
+        let q = self.split(&linear(query, &self.q, Some(&self.qb))?.contiguous())?;
+        let k = self.split(&linear(key, &self.k, Some(&self.kb))?.contiguous())?;
+        let v = self.split(&linear(value, &self.v, Some(&self.vb))?.contiguous())?;
         // RoPE positions run over the query length here (module.py:304 uses
         // `q.shape[-2]`), so a 1-token query gets position 0.
         let (q, k) = self.rope.apply(&q, &k)?;
         let ctx = sdpa(&q, &k, &v, causal)?;
-        let ctx = ctx
-            .permute((0, 2, 1, 3))?
-            .contiguous()?
-            .reshape((b, lq, d))?;
+        let ctx = ctx.transpose(1, 2).contiguous().reshape([b, lq, d]);
         linear(&ctx, &self.o, Some(&self.ob))
     }
 }
@@ -355,8 +349,8 @@ impl DependencyAwareLayer {
         w: &Weights,
         cfg: &PredictorConfig,
         max_len: usize,
-        dev: &candle_core::Device,
-        dtype: DType,
+        dev: &Device,
+        dtype: Kind,
     ) -> Result<Self> {
         Ok(Self {
             attn: CrossAttention::load(
@@ -368,13 +362,13 @@ impl DependencyAwareLayer {
                 dev,
                 dtype,
             )?,
-            norm: w.get("dep_layer.norm.weight").clone(),
+            norm: w.get("dep_layer.norm.weight").shallow_clone(),
             eps: 1e-5,
         })
     }
 
     pub fn forward(&self, hidden: &Tensor, sibling_embed: &Tensor) -> Result<Tensor> {
         let attn = self.attn.forward(sibling_embed, hidden, hidden, false)?;
-        rms_norm(&hidden.broadcast_add(&attn)?, &self.norm, self.eps)
+        rms_norm(&(hidden + attn), &self.norm, self.eps)
     }
 }

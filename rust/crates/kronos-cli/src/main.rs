@@ -5,8 +5,6 @@
 //! green build never implies working inference.
 
 use anyhow::{bail, Context, Result};
-use candle_core::Tensor;
-use candle_core::{DType, Device};
 use kronos_core::predictor::Kronos;
 use kronos_core::tokenizer::KronosTokenizer;
 use kronos_core::{
@@ -15,6 +13,8 @@ use kronos_core::{
 };
 use serde_json::json;
 use std::path::{Path, PathBuf};
+use tch::Tensor;
+use tch::{Device, Kind as DType};
 
 fn usage() -> &'static str {
     "kronos — Rust port of the Kronos financial K-line foundation model
@@ -71,7 +71,7 @@ fn parse_args(args: &[String]) -> Result<Args> {
         weights: PathBuf::new(),
         out: None,
         tokenizer: false,
-        dtype: DType::F32,
+        dtype: DType::Float,
     };
     let mut i = 0;
     while i < args.len() {
@@ -92,9 +92,9 @@ fn parse_args(args: &[String]) -> Result<Args> {
             "--dtype" => {
                 i += 1;
                 a.dtype = match args.get(i).map(|s| s.as_str()) {
-                    Some("fp32") | Some("f32") => DType::F32,
-                    Some("fp16") | Some("f16") => DType::F16,
-                    Some("bf16") => DType::BF16,
+                    Some("fp32") | Some("f32") => DType::Float,
+                    Some("fp16") | Some("f16") => DType::Half,
+                    Some("bf16") => DType::BFloat16,
                     _ => bail!("--dtype must be fp32, fp16 or bf16"),
                 };
             }
@@ -121,30 +121,23 @@ fn parse_args(args: &[String]) -> Result<Args> {
 fn tensor_stats(w: &Weights) -> serde_json::Map<String, serde_json::Value> {
     let mut out = serde_json::Map::new();
     for (name, t) in w.iter_sorted() {
-        let shape = t.shape().dims().to_vec();
-        let n = t.elem_count();
-
-        // flatten -> host -> f64, then reduce. Any failure yields nulls rather
-        // than aborting: this is a diagnostic, and a null is a visible signal.
-        let stats = t
-            .flatten_all()
-            .and_then(|f| f.to_device(&Device::Cpu))
-            .and_then(|f| f.to_dtype(DType::F64))
-            .ok()
-            .map(|f64| {
-                let sum = f64.sum_all().ok().and_then(|s| s.to_scalar::<f64>().ok());
-                let absmax = f64
-                    .abs()
-                    .and_then(|a| a.max(0))
-                    .ok()
-                    .and_then(|m| m.to_scalar::<f64>().ok());
-                (sum, absmax)
-            })
-            .unwrap_or((None, None));
-
+        let shape: Vec<usize> = t.size().iter().map(|&d| d as usize).collect();
+        let n = t.numel();
+        let host = t
+            .reshape([-1])
+            .to_device(Device::Cpu)
+            .to_kind(DType::Double);
+        let v: Option<Vec<f64>> = (&host).try_into().ok();
+        let (sum, absmax) = match v {
+            Some(v) => (
+                Some(v.iter().sum::<f64>()),
+                Some(v.iter().map(|x| x.abs()).fold(0.0f64, f64::max)),
+            ),
+            None => (None, None),
+        };
         out.insert(
-            name.clone(),
-            json!({ "shape": shape, "n": n, "sum": stats.0, "absmax": stats.1 }),
+            (*name).clone(),
+            json!({ "shape": shape, "n": n, "sum": sum, "absmax": absmax }),
         );
     }
     out
@@ -153,7 +146,11 @@ fn tensor_stats(w: &Weights) -> serde_json::Map<String, serde_json::Value> {
 fn cmd_info(args: &[String]) -> Result<()> {
     let a = parse_args(args)?;
     let cfg_raw = std::fs::read_to_string(&a.config)?;
-    let dev = Device::new_cuda_or_cpu();
+    let dev = if tch::utils::has_cuda() {
+        Device::Cuda(0)
+    } else {
+        Device::Cpu
+    };
     let dtype = a.dtype;
 
     let (n_expected, cfg_desc, n_params, keys) = if a.tokenizer {
@@ -184,7 +181,11 @@ fn cmd_manifest(args: &[String]) -> Result<()> {
     let a = parse_args(args)?;
     let out = a.out.clone().context("--out is required for `manifest`")?;
     let cfg_raw = std::fs::read_to_string(&a.config)?;
-    let dev = Device::new_cuda_or_cpu();
+    let dev = if tch::utils::has_cuda() {
+        Device::Cuda(0)
+    } else {
+        Device::Cpu
+    };
 
     let w: Weights = if a.tokenizer {
         let c = TokenizerConfig::from_json(&cfg_raw)?;
@@ -225,8 +226,8 @@ fn load_phase4(
     ctx: usize,
     pred_len: usize,
 ) -> anyhow::Result<Phase4> {
-    let dev = Device::new_cuda(0).unwrap_or(Device::Cpu);
-    let dtype = DType::F32;
+    let dev = tch::Device::cuda_if_available();
+    let dtype = DType::Float;
     let tok_cfg =
         TokenizerConfig::from_json(&std::fs::read_to_string(tok_dir.join("config.json"))?)?;
     tok_cfg.validate()?;
@@ -342,14 +343,14 @@ fn cmd_predict(args: &[String]) -> Result<()> {
     let mut rng = kronos_core::sampling::Rng::new(f.seed);
     let out = kronos_core::ar::predict(&ph.tok, &ph.mdl, &ph.rows, &p, &mut rng, &ph.dev)?;
     let preds = out.forecast;
-    let rows = preds.dim(0)?;
-    let n = preds.dim(1)?;
-    let d = preds.dim(2)?;
-    let flat = preds
-        .flatten_all()?
-        .to_device(&Device::Cpu)?
-        .to_dtype(DType::F32)?
-        .to_vec1::<f32>()?;
+    let rows = preds.size()[0] as usize;
+    let n = preds.size()[1] as usize;
+    let d = preds.size()[2] as usize;
+    let flat: Vec<f32> = (&preds
+        .reshape([-1])
+        .to_device(Device::Cpu)
+        .to_kind(DType::Float))
+        .try_into()?;
 
     if let Some(gold) = &f.golden {
         let text = std::fs::read_to_string(gold)?;
@@ -428,27 +429,23 @@ fn cmd_sampler_audit(args: &[String]) -> Result<()> {
     let f = parse_common(args)?;
     let ph = load_phase4(&f.data, &f.model_dir, &f.tok_dir, f.ctx, 1)?;
     let ctx = &ph.rows[..f.ctx];
-    let xs = kronos_core::data::stamps(ctx, &ph.dev)?.unsqueeze(0)?;
+    let xs = kronos_core::data::stamps(ctx, &ph.dev)?.unsqueeze(0);
     let v = kronos_core::data::values(ctx, &ph.dev)?;
-    let mu = v.mean_keepdim(0)?;
-    let diff = v.broadcast_sub(&mu)?;
-    let std = diff.sqr()?.mean_keepdim(0)?.sqrt()?;
-    let eps = Tensor::from_vec(vec![1e-5f32], (), &ph.dev)?;
-    let normed = v
-        .broadcast_sub(&mu)?
-        .broadcast_div(&std.broadcast_add(&eps)?)?;
-    let lo = Tensor::from_vec(vec![-5.0f32], (), &ph.dev)?;
-    let hi = Tensor::from_vec(vec![5.0f32], (), &ph.dev)?;
-    let normed = normed
-        .broadcast_maximum(&lo)?
-        .broadcast_minimum(&hi)?
-        .unsqueeze(0)?;
+    let mu = v.f_mean_dim(vec![0], true, None)?;
+    let diff = &v - &mu;
+    let std = diff
+        .multiply(&diff)
+        .f_mean_dim(vec![0], true, None)?
+        .f_sqrt()?;
+    let eps = Tensor::from_slice(&[1e-5f32]).to_device(ph.dev);
+    let normed = (&v - &mu) / (&std + &eps);
+    let normed = normed.f_clamp_min(-5.0)?.f_clamp_max(5.0)?.unsqueeze(0);
 
     let toks = ph.tok.encode(&normed)?;
     let d1 = ph.mdl.decode_s1(&toks.0, &toks.1, &xs)?;
-    let last = d1.s1_logits.narrow(1, f.ctx - 1, 1)?.squeeze(1)?; // [1, V]
-    let argmax = last.argmax(d1.s1_logits.dims().len() - 1)?;
-    let flat_arg = argmax.to_device(&Device::Cpu)?.to_vec1::<u32>()?;
+    let last = d1.s1_logits.narrow(1, f.ctx as i64 - 1, 1).squeeze_dim(1); // [1, V]
+    let argmax = last.f_argmax(-1, false)?;
+    let flat_arg: Vec<i32> = (&argmax.to_device(Device::Cpu).to_kind(DType::Int)).try_into()?;
 
     // assertion 3 needs the identity of the deterministic token: compare it
     // against the committed fixture when present.
@@ -460,30 +457,38 @@ fn cmd_sampler_audit(args: &[String]) -> Result<()> {
         top_k: 0,
         top_p: 0.9,
     };
-    let tab = kronos_core::sampling::Rng::new(f.seed).uniform_table(draws, 1, last.device())?;
+    let tab = kronos_core::sampling::Rng::new(f.seed).uniform_table(draws, 1, &last.device())?;
     let mut ids = Vec::with_capacity(draws);
     for i in 0..draws {
-        let d = tab.narrow(0, i, 1)?.squeeze(0)?;
+        let d = tab.narrow(0, i as i64, 1).squeeze_dim(0);
         let id = kronos_core::sampling::sample(&last, &cfg_hot, &d)?;
-        ids.push(id.to_device(&Device::Cpu)?.to_vec1::<u32>()?[0]);
+        let iv: Vec<i32> = (&id.to_device(Device::Cpu).to_kind(DType::Int)).try_into()?;
+        ids.push(iv[0]);
     }
     // (1) no draw outside the nucleus
     let mass = kronos_core::sampling::strictly_greater_mass(
         &last,
-        &Tensor::from_vec(vec![flat_arg[0]], (1,), &ph.dev)?,
+        &Tensor::from_slice(&[flat_arg[0]]).to_device(ph.dev),
     )?;
-    let p_analytic = 1.0f64
-        - mass
-            .to_device(&Device::Cpu)?
-            .to_dtype(DType::F32)?
-            .to_vec1::<f32>()?[0] as f64;
+    let mv0: Vec<f32> = (&mass
+        .to_device(Device::Cpu)
+        .to_kind(DType::Float)
+        .reshape([-1]))
+        .try_into()?;
+    let p_analytic = 1.0f64 - mv0[0] as f64;
     // the argmax token's probability from the softmax itself
-    let probs = kronos_core::sampling::softmax(&last)?;
-    let p_max = probs
-        .narrow(1, flat_arg[0] as usize, 1)?
-        .to_device(&Device::Cpu)?
-        .to_dtype(DType::F32)?
-        .to_vec2::<f32>()?[0][0] as f64;
+    // the audit compares draws taken at T=0.6, so the reference p must come
+    // from the SAME temperature-scaled distribution (the candle-era code
+    // softmaxed the scaled logits — a rewording of `model/kronos.py:344`).
+    let scaled = (&last * (1.0f64 / 0.6)).contiguous();
+    let probs = kronos_core::sampling::softmax(&scaled)?;
+    let pv: Vec<f32> = (&probs
+        .narrow(1, flat_arg[0] as i64, 1)
+        .to_device(Device::Cpu)
+        .to_kind(DType::Float)
+        .reshape([-1]))
+        .try_into()?;
+    let p_max = pv[0] as f64;
     let n_in = ids.iter().filter(|x| **x == flat_arg[0]).count();
     let freq = n_in as f64 / draws as f64;
     println!("argmax token prob (softmax) = {p_analytic:.4} / argmax-readback {p_max:.4}");
@@ -498,12 +503,9 @@ fn cmd_sampler_audit(args: &[String]) -> Result<()> {
     // assertion 2: every draw inside the nucleus (mass of strictly-greater <= top_p)
     let member = kronos_core::sampling::strictly_greater_mass(
         &last,
-        &Tensor::from_vec(ids.clone(), (ids.len() as u64 as usize,), &ph.dev)?,
+        &Tensor::from_slice(&ids).to_device(ph.dev),
     )?;
-    let mv = member
-        .to_device(&Device::Cpu)?
-        .to_dtype(DType::F32)?
-        .to_vec1::<f32>()?;
+    let mv: Vec<f32> = (&member.to_device(Device::Cpu).to_kind(DType::Float)).try_into()?;
     if let Some((i, m)) = mv.iter().enumerate().find(|(_, m)| **m > 0.9 + 1e-6) {
         eprintln!("FAIL (2) draw {i} outside nucleus (strictly-greater mass {m:.4})");
         failures += 1;
@@ -532,12 +534,12 @@ fn cmd_sampler_audit(args: &[String]) -> Result<()> {
 ///   3. terminal — the de-normalised OHLCVA forecast, max relative error per column.
 fn cmd_precision(args: &[String]) -> Result<()> {
     let f = parse_common(args)?;
-    let dev = Device::new_cuda(0).unwrap_or(Device::Cpu);
+    let dev = tch::Device::cuda_if_available();
 
     struct Run {
         logits0: Vec<f32>,
-        pre: Vec<u32>,
-        post: Vec<u32>,
+        pre: Vec<i32>,
+        post: Vec<i32>,
         cols: Vec<f32>,
     }
     let run = |dtype: DType, tag: &str, ms: &mut f64| -> anyhow::Result<Run> {
@@ -566,26 +568,23 @@ fn cmd_precision(args: &[String]) -> Result<()> {
 
         // lens 1: arithmetic — the same context, one coarse-token head pass
         let v = kronos_core::data::values(&rows[..f.ctx], &dev)?;
-        let mu = v.mean_keepdim(0)?;
-        let mu2 = mu.broadcast_mul(&mu)?;
-        let std = v.sqr()?.mean_keepdim(0)?.broadcast_sub(&mu2)?.sqrt()?;
-        let eps = Tensor::from_vec(vec![1e-5f32], (), &dev)?;
-        let normed = v
-            .broadcast_sub(&mu)?
-            .broadcast_div(&std.broadcast_add(&eps)?)?;
-        let normed = normed
-            .broadcast_maximum(&Tensor::from_vec(vec![-5.0f32], (), &dev)?)?
-            .broadcast_minimum(&Tensor::from_vec(vec![5.0f32], (), &dev)?)?;
-        let xs = kronos_core::data::stamps(&rows[..f.ctx], &dev)?.unsqueeze(0)?;
-        let toks = tok.encode(&normed.unsqueeze(0)?.to_dtype(dtype)?)?;
+        let mu = v.f_mean_dim(vec![0], true, None)?;
+        let mu2 = &mu * &mu;
+        let std = v.multiply(&v).f_sum_dim_intlist(vec![0], true, None)? / (f.ctx as f64);
+        let std = (std - mu2).f_sqrt()?;
+        let eps = Tensor::from_slice(&[1e-5f32]);
+        let normed = (&v - &mu) / (&std + &eps);
+        let normed = normed.f_clamp_min(-5.0)?.f_clamp_max(5.0)?;
+        let xs = kronos_core::data::stamps(&rows[..f.ctx], &dev)?.unsqueeze(0);
+        let toks = tok.encode(&normed.unsqueeze(0).to_kind(dtype))?;
         let d1 = mdl.decode_s1(&toks.0, &toks.1, &xs)?;
-        let logits0: Vec<f32> = d1
+        let logits0: Vec<f32> = (&d1
             .s1_logits
-            .narrow(1, f.ctx - 1, 1)?
-            .flatten_all()?
-            .to_device(&Device::Cpu)?
-            .to_dtype(DType::F32)?
-            .to_vec1::<f32>()?;
+            .narrow(1, f.ctx as i64 - 1, 1)
+            .reshape([-1])
+            .to_device(Device::Cpu)
+            .to_kind(DType::Float))
+            .try_into()?;
 
         // lens 2+3: the full stochastic trajectory
         let p = kronos_core::ar::ArParams::new(
@@ -600,22 +599,24 @@ fn cmd_precision(args: &[String]) -> Result<()> {
         );
         let mut rng = kronos_core::sampling::Rng::new(f.seed);
         let out = kronos_core::ar::predict(&tok, &mdl, &rows, &p, &mut rng, &dev)?;
-        let pre = out
+        let pre: Vec<i32> = (&out
             .sampled_pre
-            .flatten_all()?
-            .to_device(&Device::Cpu)?
-            .to_vec1::<u32>()?;
-        let post = out
+            .reshape([-1])
+            .to_device(Device::Cpu)
+            .to_kind(DType::Int))
+            .try_into()?;
+        let post: Vec<i32> = (&out
             .sampled_post
-            .flatten_all()?
-            .to_device(&Device::Cpu)?
-            .to_vec1::<u32>()?;
-        let cols = out
+            .reshape([-1])
+            .to_device(Device::Cpu)
+            .to_kind(DType::Int))
+            .try_into()?;
+        let cols: Vec<f32> = (&out
             .forecast
-            .flatten_all()?
-            .to_device(&Device::Cpu)?
-            .to_dtype(DType::F32)?
-            .to_vec1::<f32>()?;
+            .reshape([-1])
+            .to_device(Device::Cpu)
+            .to_kind(DType::Float))
+            .try_into()?;
         *ms = t0.elapsed().as_millis() as f64;
         println!("  {tag}: full trajectory {ms:.1} ms");
         Ok(Run {
@@ -627,9 +628,9 @@ fn cmd_precision(args: &[String]) -> Result<()> {
     };
 
     let mut ms32 = 0.0;
-    let r32 = run(DType::F32, "fp32", &mut ms32)?;
+    let r32 = run(DType::Float, "fp32", &mut ms32)?;
     let mut ms16 = 0.0;
-    let r16 = run(DType::F16, "fp16", &mut ms16)?;
+    let r16 = run(DType::Half, "fp16", &mut ms16)?;
 
     // lens 1
     let d0 = r32
@@ -663,7 +664,7 @@ fn cmd_precision(args: &[String]) -> Result<()> {
     // lens 2b: GREEDY (top_k=1) path — a token flips only when the fp16
     // arithmetic actually crosses the argmax boundary, so this isolates the
     // arithmetic from the sampler's RNG sensitivity on flat distributions.
-    let greedy = |dtype: DType| -> anyhow::Result<(Vec<u32>, Vec<u32>, Vec<f32>)> {
+    let greedy = |dtype: DType| -> anyhow::Result<(Vec<i32>, Vec<i32>, Vec<f32>)> {
         let tok_cfg = TokenizerConfig::from_json(
             &std::fs::read_to_string(f.tok_dir.join("config.json")).map_err(anyhow::Error::from)?,
         )?;
@@ -696,23 +697,25 @@ fn cmd_precision(args: &[String]) -> Result<()> {
         let mut rng = kronos_core::sampling::Rng::new(f.seed);
         let o = kronos_core::ar::predict(&tok, &mdl, &rows[..used], &p, &mut rng, &dev)?;
         Ok((
-            o.sampled_pre
-                .flatten_all()?
-                .to_device(&Device::Cpu)?
-                .to_vec1::<u32>()?,
-            o.sampled_post
-                .flatten_all()?
-                .to_device(&Device::Cpu)?
-                .to_vec1::<u32>()?,
-            o.forecast
-                .flatten_all()?
-                .to_device(&Device::Cpu)?
-                .to_dtype(DType::F32)?
-                .to_vec1::<f32>()?,
+            (&o.sampled_pre
+                .reshape([-1])
+                .to_device(Device::Cpu)
+                .to_kind(DType::Int))
+                .try_into()?,
+            (&o.sampled_post
+                .reshape([-1])
+                .to_device(Device::Cpu)
+                .to_kind(DType::Int))
+                .try_into()?,
+            (&o.forecast
+                .reshape([-1])
+                .to_device(Device::Cpu)
+                .to_kind(DType::Float))
+                .try_into()?,
         ))
     };
-    let (g32_pre, g32_post, g32_fc) = greedy(DType::F32)?;
-    let (g16_pre, g16_post, g16_fc) = greedy(DType::F16)?;
+    let (g32_pre, g32_post, g32_fc) = greedy(DType::Float)?;
+    let (g16_pre, g16_post, g16_fc) = greedy(DType::Half)?;
     let gpre = g32_pre.iter().zip(&g16_pre).filter(|(a, b)| a != b).count();
     let gpost = g32_post
         .iter()
@@ -784,46 +787,54 @@ fn cmd_microbench(args: &[String]) -> Result<()> {
         }
         i += 1;
     }
-    let dev = Device::new_cuda_or_cpu();
-    let t = Tensor::randn(0f32, 1., (batch, 512, 512), &dev)?;
+    let dev = if tch::utils::has_cuda() {
+        Device::Cuda(0)
+    } else {
+        Device::Cpu
+    };
+    let t = Tensor::randn([batch as i64, 512, 512], (DType::Float, dev));
+    let _sync = || {
+        let _ = t.to_device(Device::Cpu).to_kind(DType::Float);
+    };
     // warmup
     for _ in 0..50 {
-        let _x = t.sqr()?.affine(1.0, 0.0)?;
+        let _x = (&t * &t + 1.0).shallow_clone();
     }
-    t.device().synchronize()?;
+    _sync();
     let t0 = std::time::Instant::now();
     for _ in 0..reps {
-        let _x = t.sqr()?.affine(2.0, 0.0)?;
+        let _x = (&t * &t + 2.0).shallow_clone();
     }
-    t.device().synchronize()?;
+    _sync();
     let per = t0.elapsed().as_secs_f64() / reps as f64;
     println!(
         "sqr+affine at ({batch},512,512) f32: {per:.3} ms/op over {reps} reps  (gpu {:?})",
         p_name(&dev)
     );
     // and a big-GEMM reference for contrast
-    let a = Tensor::randn(0f32, 1., (batch * 512, 512), &dev)?;
-    let w = Tensor::randn(0f32, 1., (1024, 512), &dev)?;
-    let w = w.t()?;
+    let a = Tensor::randn([(batch * 512) as i64, 512], (DType::Float, dev));
+    let w = Tensor::randn([1024, 512], (DType::Float, dev));
+    let w = w.transpose(0, 1);
     for _ in 0..10 {
-        let _y = a.matmul(&w)?;
+        let _y = a.matmul(&w);
     }
-    t.device().synchronize()?;
+    _sync();
     let t1 = std::time::Instant::now();
     for _ in 0..reps {
-        let _y = a.matmul(&w)?;
+        let _y = a.matmul(&w);
     }
-    t.device().synchronize()?;
+    _sync();
     let per = t1.elapsed().as_secs_f64() / reps as f64;
     println!("matmul {batch}x512x1024 f32: {per:.3} ms/call");
 
     // ---- SDPA head-to-head at the real attention shape ----
     let lq = 512usize;
-    let q = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
-    let k = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
-    let v = Tensor::randn(0f32, 1., (batch, 8, lq, 64), &dev)?;
+    let q = Tensor::randn([batch as i64, 8, lq as i64, 64], (DType::Float, dev));
+    let k = Tensor::randn([batch as i64, 8, lq as i64, 64], (DType::Float, dev));
+    let v = Tensor::randn([batch as i64, 8, lq as i64, 64], (DType::Float, dev));
     let fused = || -> anyhow::Result<Tensor> {
-        kronos_core::flash::fused(&q, &k, &v, true).map_err(anyhow::Error::from)
+        Tensor::f_scaled_dot_product_attention(&q, &k, &v, None::<&Tensor>, 0.0, true, None, false)
+            .map_err(anyhow::Error::from)
     };
     match fused() {
         Ok(_) => {
@@ -831,7 +842,7 @@ fn cmd_microbench(args: &[String]) -> Result<()> {
             for _ in 0..50 {
                 let _ = fused()?;
             }
-            q.device().synchronize()?;
+            _sync();
             println!(
                 "sdpa(fused kernel): {:.3} ms/call",
                 t.elapsed().as_secs_f64() / 50.0 * 1e3
@@ -842,35 +853,23 @@ fn cmd_microbench(args: &[String]) -> Result<()> {
     let manual = |q: &Tensor| -> anyhow::Result<f64> {
         let t = std::time::Instant::now();
         for _ in 0..10 {
-            let kt = k.transpose(2, 3)?.contiguous()?;
-            let mut scores = q.matmul(&kt)?;
-            scores = scores.affine(0.125, 0.0)?;
-            let mask = Tensor::from_vec(
-                (0..lq * lq)
-                    .map(|i| {
-                        let i2 = i / lq;
-                        let j = i % lq;
-                        if j > i2 {
-                            f64::NEG_INFINITY
-                        } else {
-                            0.0
-                        }
-                    })
-                    .collect::<Vec<_>>(),
-                (lq, lq),
-                &dev,
-            )?
-            .to_dtype(q.dtype())?
-            .broadcast_as((batch, 8, lq, lq))?;
-            scores = scores.broadcast_add(&mask)?;
-            let last = scores.dims().len() - 1;
-            let max = scores.max_keepdim(last)?;
-            let expd = scores.broadcast_sub(&max)?.exp()?;
-            let sm = expd.sum_keepdim(last)?;
-            let pr = expd.broadcast_div(&sm)?;
-            let _o = pr.matmul(&v.contiguous()?)?;
+            let kt = k.transpose(2, 3).contiguous();
+            let mut scores = q.matmul(&kt) * 0.125;
+            let _mask = Tensor::f_full([lq as i64, lq as i64], 0f64, (DType::Float, dev))?;
+            let ones = Tensor::ones([lq as i64, lq as i64], (DType::Bool, dev));
+            let up = Tensor::f_triu(&ones, 1)?;
+            let mut up_f = up.to_kind(DType::Float);
+            up_f *= -1e30f64;
+            let up_f = up_f.expand([batch as i64, 8, lq as i64, lq as i64], false);
+            scores += up_f;
+            let last = scores.size().len() as i64 - 1;
+            let max = scores.f_amax(vec![last], true)?;
+            let expd = (&scores - &max).exp();
+            let sm = expd.f_sum_dim_intlist(vec![last], true, None)?;
+            let pr = expd / sm;
+            let _o = pr.matmul(&v.contiguous());
         }
-        q.device().synchronize()?;
+        _sync();
         Ok(t.elapsed().as_secs_f64() / 10.0 * 1e3)
     };
     println!("sdpa(manual chain): {:.3} ms/call", manual(&q)?);
@@ -883,12 +882,13 @@ fn p_name(dev: &Device) -> String {
 }
 
 /// Small helper so `info` can work without a GPU (CI on CPU-only runners).
+#[allow(dead_code)]
 trait DeviceExt {
     fn new_cuda_or_cpu() -> Device;
 }
 impl DeviceExt for Device {
     fn new_cuda_or_cpu() -> Device {
-        Device::new_cuda(0).unwrap_or(Device::Cpu)
+        tch::Device::cuda_if_available()
     }
 }
 
@@ -933,8 +933,12 @@ fn cmd_parity(args: &[String]) -> Result<()> {
         i += 1;
     }
 
-    let dev = Device::new_cuda_or_cpu();
-    let dtype = DType::F32;
+    let dev = if tch::utils::has_cuda() {
+        Device::Cuda(0)
+    } else {
+        Device::Cpu
+    };
+    let dtype = DType::Float;
 
     let tok_cfg_raw = std::fs::read_to_string(tok_dir.join("config.json"))?;
     let tok_cfg = TokenizerConfig::from_json(&tok_cfg_raw)?;
@@ -947,9 +951,9 @@ fn cmd_parity(args: &[String]) -> Result<()> {
     let mdl_w =
         load_predictor_weights(&model_dir.join("model.safetensors"), &mdl_cfg, dtype, &dev)?;
 
-    let x = kronos_core::npy::read_npy(&probe_dir.join("probe_x.npy"))?.to_device(&dev)?;
-    let stamp = kronos_core::npy::read_npy(&probe_dir.join("probe_stamp.npy"))?.to_device(&dev)?;
-    let ctx_len = x.dim(1)?;
+    let x = kronos_core::npy::read_npy(&probe_dir.join("probe_x.npy"))?.to_device(dev);
+    let stamp = kronos_core::npy::read_npy(&probe_dir.join("probe_stamp.npy"))?.to_device(dev);
+    let ctx_len = x.size()[1] as usize;
     let max_len = ctx_len.max(mdl_cfg.n_layers); // over-cover for the dep-layer rope
 
     let tok = KronosTokenizer::load(&tok_w, &tok_cfg, max_len, &dev, dtype)?;

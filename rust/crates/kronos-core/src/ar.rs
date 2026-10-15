@@ -18,10 +18,11 @@
 //! | `current >= max_context` | full buffer     | **drop oldest, append new** |
 
 use crate::data::Kline;
+use crate::ops::Result;
 use crate::predictor::Kronos;
 use crate::sampling::{sample, Rng, SampleCfg};
 use crate::tokenizer::KronosTokenizer;
-use candle_core::{DType, Device, Result, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// Everything the loop needs beyond the two models.
 #[derive(Debug, Clone, Copy)]
@@ -63,17 +64,17 @@ impl Default for ArParams {
 /// `x.unsqueeze(1).repeat(1, S, 1, 1).reshape(-1, T, D)`.
 fn repeat_series(t: &Tensor, s: usize) -> Result<Tensor> {
     if s == 1 {
-        return Ok(t.clone());
+        return Ok(t.shallow_clone());
     }
-    let n = t.dim(0)?;
-    let mut idx = Vec::with_capacity(n * s);
+    let n = t.size()[0];
+    let mut idx: Vec<i64> = Vec::with_capacity(n as usize * s);
     for i in 0..n {
         for _ in 0..s {
-            idx.push(i as u32);
+            idx.push(i);
         }
     }
-    let idx = Tensor::from_vec(idx, (n * s,), t.device())?;
-    t.index_select(&idx, 0)?.contiguous()
+    let idx = Tensor::from_slice(&idx).to_device(t.device());
+    Ok(t.index_select(0, &idx).contiguous())
 }
 
 /// Inputs shaped exactly as `KronosPredictor.generate` produces them.
@@ -110,8 +111,13 @@ pub struct ArOutput {
 /// A greedy token flip between two engines is only concerning when this gap is
 /// large; a flip at a gap of ~1e-3 on a logit scale of tens is arithmetic order.
 fn top2_margin(logits: &Tensor) -> Result<f32> {
-    let (vals, _) = logits.sort_last_dim(false)?;
-    let v = vals.flatten_all()?.to_vec1::<f32>()?;
+    let last = (logits.size().len() - 1) as i64;
+    let (vals, _) = logits.f_sort(last, true)?; // descending: rank0 = highest
+    let host = vals
+        .reshape([-1])
+        .to_device(Device::Cpu)
+        .to_kind(Kind::Float);
+    let v: Vec<f32> = (&host).try_into()?;
     Ok(v[0] - v[1])
 }
 
@@ -126,9 +132,9 @@ pub fn generate(
     // Cast the input to the models' compute dtype: with fp16 weights the F32
     // activations would otherwise hit a mixed-dtype matmul and error out.
     let dt = tok.dtype();
-    let x = repeat_series(&input.x, p.sample_count)?.to_dtype(dt)?;
-    let x_stamp = repeat_series(&input.x_stamp, p.sample_count)?.to_dtype(dt)?;
-    let y_stamp = repeat_series(&input.y_stamp, p.sample_count)?.to_dtype(dt)?;
+    let x = repeat_series(&input.x, p.sample_count)?.to_kind(dt);
+    let x_stamp = repeat_series(&input.x_stamp, p.sample_count)?.to_kind(dt);
+    let y_stamp = repeat_series(&input.y_stamp, p.sample_count)?.to_kind(dt);
 
     let profile = std::env::var("KRONOS_PROFILE").is_ok();
     let t0 = std::time::Instant::now();
@@ -142,85 +148,88 @@ pub fn generate(
     // Pre-draw every uniform for the whole trajectory and upload ONCE: the
     // Phase-4 sampler read them off the host per step (one sync each). The
     // row order matches the loop's batch order, step-major.
-    let batch = x_tokens.0.dim(0)?;
     let dev = x.device();
+    let batch = x_tokens.0.size()[0];
     let draws_tab = if p.cfg.top_k == 1 {
-        Tensor::zeros((p.pred_len, batch), candle_core::DType::F32, dev)?
+        Tensor::zeros([p.pred_len as i64, batch], (Kind::Float, dev))
     } else {
-        rng.uniform_table(p.pred_len, batch, dev)?.to_device(dev)?
+        rng.uniform_table(p.pred_len, batch as usize, &dev)?
+            .to_device(dev)
     };
-    let initial = x.dim(1)?;
-    let batch = x_tokens.0.dim(0)?;
-    let _dev = x.device();
-    let total = initial + p.pred_len;
-    let full_stamp = Tensor::cat(&[&x_stamp, &y_stamp], 1)?.contiguous()?;
+    let initial = x.size()[1];
+    let total = initial + p.pred_len as i64;
+    let full_stamp = Tensor::cat(&[&x_stamp, &y_stamp], 1).contiguous();
     let t_loop = std::time::Instant::now();
     let (mut t_samp, mut t_rest_total) = (0.0f64, 0.0f64);
     let (mut t_s1, mut t_s2) = (0.0f64, 0.0f64);
 
     // Ring buffer: the initial window holds only the LAST min(T, max_ctx) tokens.
-    let buffer_len = initial.min(p.max_context);
-    let start_idx = initial.saturating_sub(p.max_context);
-    let mut s1 = x_tokens.0.narrow(1, start_idx, buffer_len)?;
-    let mut s2 = x_tokens.1.narrow(1, start_idx, buffer_len)?;
+    let buffer_len = initial.min(p.max_context as i64);
+    let start_idx = (initial - p.max_context as i64).max(0);
+    let mut s1 = x_tokens.0.narrow(1, start_idx, buffer_len);
+    let mut s2 = x_tokens.1.narrow(1, start_idx, buffer_len);
     let mut generated_pre: Vec<Tensor> = Vec::with_capacity(p.pred_len);
     let mut generated_post: Vec<Tensor> = Vec::with_capacity(p.pred_len);
 
     for i in 0..p.pred_len {
-        let current = initial + i;
-        let window_len = s1.dim(1)?;
+        let current = initial + i as i64;
+        let window_len = s1.size()[1];
         // stamp window corresponds exactly to the token window
-        let cs = current.saturating_sub(p.max_context);
-        let stamp = full_stamp.narrow(1, cs, window_len)?;
+        let cs = (current - p.max_context as i64).max(0);
+        let stamp = full_stamp.narrow(1, cs, window_len);
 
         let ts = std::time::Instant::now();
         let d1 = model.decode_s1(&s1, &s2, &stamp)?;
-        t_rest_total += ts.elapsed().as_secs_f64();
-        t_s1 += ts.elapsed().as_secs_f64();
-        let s1_last = d1.s1_logits.narrow(1, window_len - 1, 1)?.squeeze(1)?;
+        let dt_s1 = ts.elapsed().as_secs_f64();
+        t_rest_total += dt_s1;
+        t_s1 += dt_s1;
+        let s1_last = d1.s1_logits.narrow(1, window_len - 1, 1).squeeze_dim(1);
         let trace = std::env::var("KRONOS_TRACE_TOKENS").is_ok();
         if trace {
             let m = top2_margin(&s1_last)?;
             let a = s1_last
-                .argmax(s1_last.dims().len() - 1)?
-                .to_device(&Device::Cpu)?
-                .to_vec1::<u32>()?[0];
-            eprintln!("  step {i:3}: s1 top1={a} margin={m:.4}");
+                .f_argmax(-1, false)?
+                .to_device(Device::Cpu)
+                .to_kind(Kind::Int);
+            let a0: Vec<i32> = (&a).try_into()?;
+            eprintln!("  step {i:3}: s1 top1={} margin={m:.4}", a0[0]);
         }
-        let draws = draws_tab.narrow(0, i, 1)?.squeeze(0)?;
+        let draws = draws_tab.narrow(0, i as i64, 1).squeeze_dim(0);
         let ts = std::time::Instant::now();
-        let sample_pre = sample(&s1_last, &p.cfg, &draws)?.unsqueeze(1)?; // [B, 1]
+        let sample_pre = sample(&s1_last, &p.cfg, &draws)?.unsqueeze(1); // [B, 1]
         t_samp += ts.elapsed().as_secs_f64();
 
         let ts = std::time::Instant::now();
         let s2_logits = model.decode_s2(&d1.context, &sample_pre)?;
-        t_rest_total += ts.elapsed().as_secs_f64();
-        t_s2 += ts.elapsed().as_secs_f64();
-        let s2_last = s2_logits.narrow(1, window_len - 1, 1)?.squeeze(1)?;
+        let dt_s2 = ts.elapsed().as_secs_f64();
+        t_rest_total += dt_s2;
+        t_s2 += dt_s2;
+        let s2_last = s2_logits.narrow(1, window_len - 1, 1).squeeze_dim(1);
         if trace {
             let m = top2_margin(&s2_last)?;
             let a = s2_last
-                .argmax(s2_last.dims().len() - 1)?
-                .to_device(&Device::Cpu)?
-                .to_vec1::<u32>()?[0];
-            eprintln!("  step {i:3}: s2 top1={a} margin={m:.4}");
+                .f_argmax(-1, false)?
+                .to_device(Device::Cpu)
+                .to_kind(Kind::Int);
+            let a0: Vec<i32> = (&a).try_into()?;
+            eprintln!("  step {i:3}: s2 top1={} margin={m:.4}", a0[0]);
         }
         let ts = std::time::Instant::now();
-        let sample_post = sample(&s2_last, &p.cfg, &draws)?.unsqueeze(1)?; // [B, 1]
+        let sample_post = sample(&s2_last, &p.cfg, &draws)?.unsqueeze(1); // [B, 1]
         t_samp += ts.elapsed().as_secs_f64();
 
-        generated_pre.push(sample_pre.clone());
-        generated_post.push(sample_post.clone());
+        generated_pre.push(sample_pre.shallow_clone());
+        generated_post.push(sample_post.shallow_clone());
 
         // buffer update: append while the window still has room, else slide
-        if current < p.max_context {
-            s1 = Tensor::cat(&[&s1, &sample_pre], 1)?.contiguous()?;
-            s2 = Tensor::cat(&[&s2, &sample_post], 1)?.contiguous()?;
+        if (current as usize) < p.max_context {
+            s1 = Tensor::cat(&[&s1, &sample_pre], 1).contiguous();
+            s2 = Tensor::cat(&[&s2, &sample_post], 1).contiguous();
         } else {
-            let w1 = s1.dim(1)?;
-            let w2 = s2.dim(1)?;
-            s1 = Tensor::cat(&[&s1.narrow(1, 1, w1 - 1)?, &sample_pre], 1)?.contiguous()?;
-            s2 = Tensor::cat(&[&s2.narrow(1, 1, w2 - 1)?, &sample_post], 1)?.contiguous()?;
+            let w1 = s1.size()[1];
+            let w2 = s2.size()[1];
+            s1 = Tensor::cat(&[&s1.narrow(1, 1, w1 - 1), &sample_pre], 1).contiguous();
+            s2 = Tensor::cat(&[&s2.narrow(1, 1, w2 - 1), &sample_post], 1).contiguous();
         }
     }
 
@@ -245,18 +254,21 @@ pub fn generate(
     }
     let t_dec = std::time::Instant::now();
     // Final decode over the last max_context positions of the full stream.
-    let mut all_pre = x_tokens.0.clone();
+    let mut all_pre = x_tokens.0.shallow_clone();
     for g in &generated_pre {
-        all_pre = Tensor::cat(&[&all_pre, g], 1)?;
+        all_pre = Tensor::cat(&[&all_pre, g], 1);
     }
-    let mut all_post = x_tokens.1.clone();
+    let mut all_post = x_tokens.1.shallow_clone();
     for g in &generated_post {
-        all_post = Tensor::cat(&[&all_post, g], 1)?;
+        all_post = Tensor::cat(&[&all_post, g], 1);
     }
-    let cs = total.saturating_sub(p.max_context);
-    let width = total - cs;
-    let z_in_s1 = all_pre.narrow(1, cs, width)?.contiguous()?;
-    let z_in_s2 = all_post.narrow(1, cs, width)?.contiguous()?;
+    // the candle-era clamping: when the full stream is SHORTER than
+    // max_context (ctx256/pred8 runs), the decode-window is the whole stream
+    let width = p.max_context as i64;
+    let start = total.saturating_sub(width).max(0);
+    let width = width.min(total - start);
+    let z_in_s1 = all_pre.narrow(1, start, width).contiguous();
+    let z_in_s2 = all_post.narrow(1, start, width).contiguous();
     let z = tok.decode(&(z_in_s1, z_in_s2))?;
 
     if profile {
@@ -266,12 +278,14 @@ pub fn generate(
         );
     }
     // mean over the sample axis: [n*S, L, 6] -> [n, L, 6]
-    let w = z.dim(1)?;
-    let d_in = z.dim(2)?;
-    let n = batch / p.sample_count;
-    let z = z.reshape((p.sample_count, n, w, d_in))?.mean(0)?;
-    let sampled_pre = Tensor::cat(&generated_pre, 1)?.contiguous()?;
-    let sampled_post = Tensor::cat(&generated_post, 1)?.contiguous()?;
+    let w = z.size()[1];
+    let d_in = z.size()[2];
+    let n = batch / p.sample_count as i64;
+    let z = z
+        .reshape([p.sample_count as i64, n, w, d_in])
+        .f_mean_dim(vec![0_i64], false, None)?;
+    let sampled_pre = Tensor::cat(&generated_pre, 1).contiguous();
+    let sampled_post = Tensor::cat(&generated_post, 1).contiguous();
     Ok(ArOutput {
         z,
         sampled_pre,
@@ -296,7 +310,7 @@ pub fn predict(
 ) -> Result<PredictOutput> {
     debug_assert!(rows.len() > p.pred_len);
     let ctx = rows.len() - p.pred_len;
-    let eps = Tensor::from_vec(vec![1e-5f32], (), dev)?;
+    let eps = Tensor::from_slice(&[1e-5f32]).to_device(*dev);
 
     let ctx_rows = &rows[..ctx];
     let y_rows = &rows[ctx..];
@@ -306,30 +320,28 @@ pub fn predict(
     let v = crate::data::values(ctx_rows, dev)?; // [ctx, 6]
 
     // per-feature mean over the window: [1, 6]
-    let mu = v.mean_keepdim(0)?;
-    let diff = v.broadcast_sub(&mu)?;
-    let var = diff.sqr()?.mean_keepdim(0)?;
-    let std = var.sqrt()?;
+    let mu = v.f_mean_dim(vec![0_i64], true, None)?;
+    let diff = &v - &mu;
+    let var = diff.multiply(&diff).f_mean_dim(vec![0_i64], true, None)?;
+    let std = var.f_sqrt()?;
 
-    let normed = v
-        .broadcast_sub(&mu)?
-        .broadcast_div(&std.broadcast_add(&eps)?)?;
-    let lo = Tensor::from_vec(vec![-p.clip], (), dev)?;
-    let hi = Tensor::from_vec(vec![p.clip], (), dev)?;
-    let normed = normed.broadcast_maximum(&lo)?.broadcast_minimum(&hi)?;
+    let normed = (&v - &mu) / (&std + &eps);
+    let normed = normed
+        .f_clamp_min(-(p.clip as f64))?
+        .f_clamp_max(p.clip as f64)?;
 
     let input = ArInput {
-        x: normed.unsqueeze(0)?.contiguous()?,
-        x_stamp: xs.unsqueeze(0)?,
-        y_stamp: ys.unsqueeze(0)?,
+        x: normed.unsqueeze(0).contiguous(),
+        x_stamp: xs.unsqueeze(0),
+        y_stamp: ys.unsqueeze(0),
     };
     let out = generate(tok, model, &input, p, rng)?;
-    let mut res = out.z.to_dtype(DType::F32)?; // de-normalise in f32, like the predictor
-    let w = res.dim(1)?;
-    res = res.narrow(1, w - p.pred_len, p.pred_len)?;
+    let mut res = out.z.to_kind(Kind::Float); // de-normalise in f32, like the predictor
+    let w = res.size()[1];
+    res = res.narrow(1, w - p.pred_len as i64, p.pred_len as i64);
     // de-normalise with the SAME (std + 1e-5) the reference uses
-    let scale = std.broadcast_add(&eps)?;
-    let forecast = res.broadcast_mul(&scale)?.broadcast_add(&mu)?;
+    let scale = &std + &eps;
+    let forecast = res * scale + &mu;
     Ok(PredictOutput {
         forecast,
         sampled_pre: out.sampled_pre,

@@ -15,8 +15,8 @@
 //! checkpoints are written by `PyTorchModelHubMixin` from the module tree.
 
 use crate::config::{PredictorConfig, TokenizerConfig};
-use candle_core::{DType, Device, Tensor};
 use std::collections::{BTreeMap, BTreeSet};
+use tch::{Device, Kind, Tensor};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
@@ -220,10 +220,10 @@ fn expected_shape_tok(name: &str, t: &TokenizerConfig) -> Option<Vec<usize>> {
 /// builds with `2 ** torch.arange(...)` (module.py:68-69). `torch.arange`
 /// without a `dtype=` argument yields int64, and `register_buffer` preserves
 /// that, so these are genuinely i64 on disk and we keep them i64 here.
-fn expected_dtype(name: &str) -> DType {
+fn expected_dtype(name: &str) -> Kind {
     match name {
-        "tokenizer.bsq.basis" | "tokenizer.bsq.group_basis" => DType::I64,
-        _ => DType::F32,
+        "tokenizer.bsq.basis" | "tokenizer.bsq.group_basis" => Kind::Int64,
+        _ => Kind::Float,
     }
 }
 
@@ -234,7 +234,7 @@ fn expected_dtype(name: &str) -> DType {
 /// `Result` through every `forward`.
 pub struct Weights {
     tensors: BTreeMap<String, Tensor>,
-    pub dtype: DType,
+    pub dtype: Kind,
 }
 
 impl Weights {
@@ -265,14 +265,14 @@ impl Weights {
         for name in expected {
             let t = &raw[name];
             let want = expected_dtype(name);
-            if t.dtype() != want {
+            if t.kind() != want {
                 return Err(LoadError::DTypeMismatch {
                     name: name.clone(),
-                    found: format!("{:?} (expected {:?})", t.dtype(), want),
+                    found: format!("{:?} (expected {:?})", t.kind(), want),
                 });
             }
             if let Some(exp) = shape_of(name) {
-                let found: Vec<usize> = t.shape().dims().to_vec();
+                let found: Vec<usize> = t.size().iter().map(|&d| d as usize).collect();
                 if found != exp {
                     return Err(LoadError::ShapeMismatch {
                         name: name.clone(),
@@ -288,20 +288,20 @@ impl Weights {
     pub fn load(
         path: &std::path::Path,
         expected: &BTreeSet<String>,
-        dtype: DType,
+        dtype: Kind,
         dev: &Device,
     ) -> Result<Self, LoadError> {
         let raw = read_cpuside(path)?;
         let mut tensors = BTreeMap::new();
         for name in expected {
-            if raw[name].dtype() == DType::I64 {
+            if raw[name].kind() == Kind::Int64 {
                 // The two BSQ basis buffers are the only int tensors, and they
                 // fill the training-side loss only. Inference never reads them
-                // (`group_codebook` is rebuilt from config), and candle has no
+                // (`group_codebook` is rebuilt from config), and the predictor path never
                 // i64 CUDA path, so leave them out of the device map.
                 continue;
             }
-            let t = raw[name].to_device(dev).and_then(|t| t.to_dtype(dtype));
+            let t = raw[name].f_to(*dev).and_then(|t| t.f_totype(dtype));
             tensors.insert(
                 name.clone(),
                 t.map_err(|e| LoadError::Io(format!("{name}: {e}")))?,
@@ -318,7 +318,7 @@ impl Weights {
     }
 
     pub fn get_cloned(&self, name: &str) -> Tensor {
-        self.get(name).clone()
+        self.get(name).shallow_clone()
     }
 
     pub fn len(&self) -> usize {
@@ -329,34 +329,31 @@ impl Weights {
         self.tensors.is_empty()
     }
 
-    pub fn dtype(&self) -> DType {
+    pub fn dtype(&self) -> Kind {
         self.dtype
     }
 
     /// Total parameter count, for reporting and for cross-checking against the
     /// paper's Table 1 (24.7 M / 102.3 M / 499.2 M).
     pub fn numel(&self) -> usize {
-        self.tensors.values().map(|t| t.elem_count()).sum()
+        self.tensors.values().map(|t| t.numel()).sum()
     }
 }
 
 /// Read a safetensors file into a CPU-side name->Tensor map.
 ///
-/// We deliberately go through `load_buffer` rather than holding a mmap: the
-/// files are <=100 MB and load once at startup, and this keeps us on candle's
-/// public API instead of pinning the safetensors crate's version.
+/// Large files (<=150 MB) load once at startup through tch's native
+/// safetensors reader; no third-party safetensors dependency needed.
 fn read_cpuside(path: &std::path::Path) -> Result<BTreeMap<String, Tensor>, LoadError> {
-    let bytes =
-        std::fs::read(path).map_err(|e| LoadError::Io(format!("{}: {e}", path.display())))?;
-    let map = candle_core::safetensors::load_buffer(&bytes, &Device::Cpu)
+    let pairs = Tensor::read_safetensors(path)
         .map_err(|e| LoadError::Io(format!("{}: {e}", path.display())))?;
-    Ok(map.into_iter().collect())
+    Ok(pairs.into_iter().collect())
 }
 
 pub fn load_predictor_weights(
     path: &std::path::Path,
     cfg: &PredictorConfig,
-    dtype: DType,
+    dtype: Kind,
     dev: &Device,
 ) -> Result<Weights, LoadError> {
     let expected = expected_predictor_keys(cfg);
@@ -367,7 +364,7 @@ pub fn load_predictor_weights(
 pub fn load_tokenizer_weights(
     path: &std::path::Path,
     cfg: &TokenizerConfig,
-    dtype: DType,
+    dtype: Kind,
     dev: &Device,
 ) -> Result<Weights, LoadError> {
     let expected = expected_tokenizer_keys(cfg);

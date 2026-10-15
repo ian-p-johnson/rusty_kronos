@@ -9,12 +9,13 @@
 //! number would show "something is slightly wrong" and nothing else.
 
 use crate::npy::{fixture_path, read_npy};
+use crate::ops::Result;
 use crate::predictor::Kronos;
 use crate::tokenizer::KronosTokenizer;
-use candle_core::{DType, Device, Result, Tensor};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::path::Path;
+use tch::{Device, Kind, Tensor};
 
 /// One tensor's parity verdict.
 #[derive(Serialize, Debug)]
@@ -50,26 +51,26 @@ pub fn run_probe(
 ) -> Result<ProbeOutput> {
     let mut out = ProbeOutput::default();
     let (s1_ids, s2_ids) = tok.encode(x)?;
-    out.insert("token_s1", s1_ids.to_dtype(DType::F64)?);
-    out.insert("token_s2", s2_ids.to_dtype(DType::F64)?);
+    out.insert("token_s1", s1_ids.to_kind(Kind::Double));
+    out.insert("token_s2", s2_ids.to_kind(Kind::Double));
 
-    let recon = tok.decode(&(s1_ids.clone(), s2_ids.clone()))?;
-    out.insert("tokenizer_recon", recon.to_dtype(DType::F64)?);
+    let recon = tok.decode(&(s1_ids.shallow_clone(), s2_ids.shallow_clone()))?;
+    out.insert("tokenizer_recon", recon.to_kind(Kind::Double));
 
     let d1 = model.decode_s1(&s1_ids, &s2_ids, stamp)?;
     let last = |t: &Tensor| -> Result<Tensor> {
-        t.narrow(1, t.dim(1)? - 1, 1)?
-            .squeeze(1)?
-            .to_dtype(DType::F64)
+        Ok(t.narrow(1, t.size()[1] - 1, 1)
+            .squeeze_dim(1)
+            .to_kind(Kind::Double))
     };
     out.insert("s1_logits_last", last(&d1.s1_logits)?);
     out.insert("context_last", last(&d1.context)?);
 
     let pre_arg = d1
         .s1_logits
-        .narrow(1, d1.s1_logits.dim(1)? - 1, 1)?
-        .argmax(2)?;
-    out.insert("pre_argmax", pre_arg.to_dtype(DType::F64)?);
+        .narrow(1, d1.s1_logits.size()[1] - 1, 1)
+        .f_argmax(2, false)?;
+    out.insert("pre_argmax", pre_arg.to_kind(Kind::Double));
 
     let s2_logits = model.decode_s2(&d1.context, &pre_arg)?;
     out.insert("s2_logits_last", last(&s2_logits)?);
@@ -89,7 +90,7 @@ pub fn compare_stages(out: &ProbeOutput, fixture_dir: &Path, rtol: f64) -> Vec<S
         if !path.exists() {
             reports.push(StageReport {
                 name: name.clone(),
-                shape: got.dims().to_vec(),
+                shape: got.size().iter().map(|&d| d as usize).collect(),
                 max_abs: f64::NAN,
                 max_rel: f64::NAN,
                 pass: false,
@@ -104,20 +105,16 @@ pub fn compare_stages(out: &ProbeOutput, fixture_dir: &Path, rtol: f64) -> Vec<S
             }
         };
         // fixtures are stored on CPU; bring ours over and cast to the same dtype
-        let got_cpu = got.to_device(&Device::Cpu).unwrap_or_else(|_| got.clone());
-        let want_f64 = match want.to_dtype(DType::F64) {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
-        let got_f64 = match got_cpu.to_dtype(DType::F64) {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
+        let got_cpu = got
+            .f_to(Device::Cpu)
+            .unwrap_or_else(|_| got.shallow_clone());
+        let want_f64 = want.to_kind(Kind::Double);
+        let got_f64 = got_cpu.to_kind(Kind::Double);
 
-        if got_f64.dims() != want_f64.dims() {
+        if got_f64.size() != want_f64.size() {
             reports.push(StageReport {
                 name: name.clone(),
-                shape: got_f64.dims().to_vec(),
+                shape: got_f64.size().iter().map(|&d| d as usize).collect(),
                 max_abs: f64::INFINITY,
                 max_rel: f64::INFINITY,
                 pass: false,
@@ -134,7 +131,7 @@ pub fn compare_stages(out: &ProbeOutput, fixture_dir: &Path, rtol: f64) -> Vec<S
         };
         reports.push(StageReport {
             name: name.clone(),
-            shape: got_f64.dims().to_vec(),
+            shape: got_f64.size().iter().map(|&d| d as usize).collect(),
             max_abs,
             max_rel,
             pass,
@@ -145,18 +142,13 @@ pub fn compare_stages(out: &ProbeOutput, fixture_dir: &Path, rtol: f64) -> Vec<S
 }
 
 fn diff_stats(a: &Tensor, b: &Tensor) -> (f64, f64) {
-    let af = match a.to_dtype(DType::F64).and_then(|t| t.flatten_all()) {
-        Ok(t) => t,
-        Err(_) => return (f64::NAN, f64::NAN),
+    let af = a.to_kind(Kind::Double).reshape([-1]);
+    let bf = b.to_kind(Kind::Double).reshape([-1]);
+    let (Ok(af_vec), Ok(bf_vec)) = (Vec::<f64>::try_from(&af), Vec::<f64>::try_from(&bf)) else {
+        return (f64::NAN, f64::NAN);
     };
-    let bf = match b.to_dtype(DType::F64).and_then(|t| t.flatten_all()) {
-        Ok(t) => t,
-        Err(_) => return (f64::NAN, f64::NAN),
-    };
-    let (av, bv) = match (af.to_vec1::<f64>(), bf.to_vec1::<f64>()) {
-        (Ok(a), Ok(b)) => (a, b),
-        _ => return (f64::NAN, f64::NAN),
-    };
+    let av = af_vec;
+    let bv = bf_vec;
     if av.len() != bv.len() {
         return (f64::INFINITY, f64::INFINITY);
     }
@@ -166,7 +158,6 @@ fn diff_stats(a: &Tensor, b: &Tensor) -> (f64, f64) {
     for (x, y) in av.iter().zip(&bv) {
         if x.is_nan() || y.is_nan() {
             nan_count += 1;
-            // treat NaN in either as a hard failure
             max_abs = f64::INFINITY;
             continue;
         }
@@ -186,7 +177,6 @@ fn diff_stats(a: &Tensor, b: &Tensor) -> (f64, f64) {
     (max_abs, max_abs / max_val)
 }
 
-/// Print a human-readable parity table and return the number of failures.
 pub fn print_report(reports: &[StageReport]) -> usize {
     let mut fails = 0usize;
     println!(

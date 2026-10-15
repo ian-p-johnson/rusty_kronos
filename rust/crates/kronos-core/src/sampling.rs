@@ -7,36 +7,29 @@
 //!   degenerates to argmax. We take the argmax directly — same outcome, no host
 //!   sync — and this is what gates the golden CSVs.
 //! * **Stochastic** (`top_p < 1.0` or `top_k > 1`): a categorical draw. We do
-//!   NOT reproduce torch's Philox stream (the agreed-par is *distributional*,
+//!   NOT reproduce torch's Philox stream (the agreed parity is *distributional*,
 //!   see `PORTING_FROM_PYTHON.md` §8); uniforms come from a seeded SplitMix64
 //!   and are drawn up front, once per trajectory.
 //!
-//! Phase 5 (batch throughput) moved sampling into **sorted space**, which
-//! replaced two Phase-4 costs with one sort:
-//!
-//! * the Phase-4 nucleus filter built a `[B, V, V]` strict-greater table every
-//!   step — 42 MB of intermediate traffic at B=10 — now the filter is a prefix
-//!   count over the descending sort, O(B·V·logV);
-//! * the Phase-4 sampler moved probabilities to the host per step to run the
-//!   inverse CDF — now the whole draw is GPU-side from pre-drawn uniforms.
-//!
-//! Upstream semantics preserved:
+//! Phase 5 moved sampling into **sorted space** (O(B·V·logV), GPU-side draws);
+//! Phase 6 keeps that algorithm on the torch substrate. Upstream semantics
+//! preserved:
 //!  * `filter` RETURNS inside the top-k branch, so `top_p` is ignored whenever
 //!    `top_k > 0` (model/kronos.py:347-352);
 //!  * the kept set is the **contiguous prefix** of the descending sort: rank r
-//!    is kept iff the cumulative mass before it is `<= top_p` — upstream's
-//!    one-right-shift rule verbatim (module-style see model/kronos.py:359-369);
+//!    is kept iff the cumulative mass before it is `<= top_p` (module-style
+//!    one-right-shift rule, model/kronos.py:359-369);
 //!  * renormalising over that kept prefix is torch's multinomial over the
 //!    FILTERED distribution;
 //!  * ties: `logits < kth` removal keeps whole tie groups; a descending sort
 //!    groups them too, and the k-th-largest threshold lands on the same set.
 //!
-//! Traversal order is probability-sorted rather than token-id order. The kept
-//! set and its renormalised probabilities are identical, so the distribution is
-//! unchanged, but individual draws differ from a host-side traversal of the
-//! same uniforms. This is precisely the distributional parity we committed to.
+//! Traversal order is probability-sorted rather than token-id order, so
+//! individual draws differ from a host-side traversal of the same uniforms —
+//! the distributional parity we committed to.
 
-use candle_core::{DType, Device, Result, Tensor};
+use crate::ops::Result;
+use tch::{Device, Kind, Tensor};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SampleCfg {
@@ -89,26 +82,25 @@ impl Rng {
                 v.push(self.next_f64() as f32);
             }
         }
-        Tensor::from_vec(v, (steps, batch), dev)
+        Ok(Tensor::from_slice(&v)
+            .reshape([steps as i64, batch as i64])
+            .to_device(*dev))
     }
 }
 
-/// Numerically-stable softmax over the last axis (avoids the cuDNN-gated op).
+/// Numerically-stable softmax over the last axis (longhand; the fused
+/// form is what torch's own ops call — this is for clarity and audits).
 pub fn softmax(x: &Tensor) -> Result<Tensor> {
-    let last = x.dims().len() - 1;
-    let max = x.max_keepdim(last)?;
-    let exp = x.broadcast_sub(&max)?.exp()?;
-    let den = exp.sum_keepdim(last)?;
-    exp.broadcast_div(&den)
+    let last = x.size().len() as i64 - 1;
+    let max = x.f_amax(vec![last], true)?;
+    let exp = (x - max).f_exp()?;
+    let den = exp.f_sum_dim_intlist(vec![last], true, None)?;
+    Ok(exp / den)
 }
 
 /// One rank-position helper: `[V]` of 0.0, 1.0, ... as f32.
 fn rank_positions(v: u32, dev: &Device) -> Result<Tensor> {
-    Tensor::from_vec(
-        (0..v).map(|i| i as f32).collect::<Vec<_>>(),
-        (v as usize,),
-        dev,
-    )
+    Tensor::f_arange_start_step(0.0, v as f64, 1.0, (Kind::Float, *dev))
 }
 
 /// Sorted-space categorical sampling over `[B, V]` logits.
@@ -118,98 +110,106 @@ fn rank_positions(v: u32, dev: &Device) -> Result<Tensor> {
 pub fn sample(logits: &Tensor, cfg: &SampleCfg, draws: &Tensor) -> Result<Tensor> {
     if cfg.top_k == 1 {
         // argmax: the degenerate multinomial. No host sync, and this is the
-        // path that gates the golden CSVs.
-        return logits.argmax(logits.dims().len() - 1);
+        // path that gates the golden CSVs. Kind::Int because torch's id
+        // vocabulary here is i32/i64, not u32.
+        return Ok(logits.f_argmax(-1, false)?.to_kind(Kind::Int));
     }
-    let last = logits.dims().len() - 1;
-    let shape = logits.dims().to_vec();
-    let (b, v) = (shape[0], shape[last]);
+    let dim = (logits.size().len() - 1) as i64;
+    let size = logits.size();
+    let b = size[0];
+    let v = size[dim as usize];
 
-    // callers usually hand a strided last-position slice; sort needs contiguous
+    // callers usually hand a strided last-position slice; sort/kernels want
+    // contiguous input
     let scaled = if cfg.temperature == 1.0 {
-        logits.contiguous()?
+        logits.contiguous()
     } else {
-        logits
-            .affine(1.0f64 / cfg.temperature as f64, 0.0)?
-            .contiguous()?
+        (logits * (1.0f64 / cfg.temperature as f64)).contiguous()
     };
 
     // descending sort: rank 0 = highest logit
-    let (vals, idx) = scaled.sort_last_dim(false)?;
+    let (vals, idx) = scaled.f_sort(dim, true)?;
     let probs = softmax(&vals)?;
-    let cdf = probs.cumsum(last)?;
+    let cdf = probs.f_cumsum(dim, None)?;
 
     // ---- kept-prefix length K (one scalar per row) ----
     let cdf_excl = Tensor::cat(
         &[
-            &Tensor::zeros((b, 1), probs.dtype(), probs.device())?,
-            &cdf.narrow(last, 0, v - 1)?,
+            &Tensor::zeros([b, 1], (probs.kind(), probs.device())),
+            &cdf.narrow(dim, 0, v - 1),
         ],
-        last,
-    )?;
+        dim,
+    );
     let k_counts = if cfg.top_k > 0 {
-        let k = cfg.top_k.min(v as u32) as f32;
+        let k = cfg.top_k.min(v as u32) as f64;
         // ranks < k are kept -> prefix length min(k, V)
-        k_counts_from_positions(&rank_positions(v as u32, probs.device())?, k as u32, (b, v))?
+        let positions = rank_positions(v as u32, &probs.device())?;
+        let mask = positions.unsqueeze(0).expand([b, v], false);
+        mask.f_lt(k)?.f_sum_dim_intlist(vec![dim], false, None)?
     } else {
         // rank r kept iff cdf_excl[r] <= top_p; the prefix property then makes
         // the kept set ranks 0..K-1
-        let keep = cdf_excl.broadcast_le(
-            &Tensor::from_vec(vec![cfg.top_p], (), probs.device())?.to_dtype(probs.dtype())?,
-        )?;
-        keep.to_dtype(probs.dtype())?.sum(last)?
+        cdf_excl
+            .f_le(cfg.top_p as f64)?
+            .f_sum_dim_intlist(vec![dim], false, None)?
     };
+    let kcounts_f = k_counts.to_kind(Kind::Float);
 
     // ---- sample the rank within the kept prefix ----
     // renormalise: norm[r] = cdf[r] / cdf[K-1]; pick the LAST rank whose norm
     // is still below the draw (inverse-CDF), clamped into the prefix against
     // rounding at u -> 1.
-    let positions = rank_positions(v as u32, probs.device())?.to_dtype(probs.dtype())?;
-    let kpos = positions
-        .unsqueeze(0)?
-        .broadcast_as((b, v))?
-        .broadcast_eq(
-            &k_counts
-                .affine(1.0f64, -1.0)?
-                .unsqueeze(1)?
-                .to_dtype(probs.dtype())?,
-        )?
-        .to_dtype(probs.dtype())?; // [B, V] one-hot at K-1
-    let total_kept = cdf.broadcast_mul(&kpos)?.sum(last)?.unsqueeze(1)?; // [B, 1]
-    let norm = cdf.broadcast_div(&total_kept)?;
-    let lt = norm.broadcast_lt(
-        &draws
-            .to_device(probs.device())?
-            .to_dtype(probs.dtype())?
-            .unsqueeze(1)?,
-    )?;
-    let mut rank = lt.to_dtype(probs.dtype())?.sum(last)?; // [B] f32
-                                                           // clamp to [0, K-1]
-    rank = rank.broadcast_minimum(&k_counts.affine(1.0f64, -1.0)?)?;
-    rank = rank.broadcast_maximum(&Tensor::zeros((b,), probs.dtype(), probs.device())?)?;
+    let positions = rank_positions(v as u32, &probs.device())?;
+    // one-hot of kept_last (K-1) over the rank axis: [B, V]
+    let kpos = &kcounts_f - 1.0;
+    let konehot = positions
+        .unsqueeze(0)
+        .expand([b, v], false)
+        .f_eq_tensor(&kpos)?
+        .to_kind(Kind::Float);
+    let total_kept = cdf
+        .multiply(&konehot)
+        .f_sum_dim_intlist(vec![dim], false, None)?
+        .unsqueeze(1); // [B, 1]
+    let norm = cdf / total_kept;
+    let dval = draws
+        .f_to(probs.device())?
+        .to_kind(Kind::Float)
+        .unsqueeze(1);
+    let lt = norm.f_lt_tensor(&dval)?;
+    let rank = lt
+        .to_kind(Kind::Float)
+        .f_sum_dim_intlist(vec![dim], false, None)?;
+    // clamp to [0, K-1]
+    let kmax = kcounts_f - 1.0;
+    let rank = rank.f_clamp_max_tensor(&kmax)?;
+    let rank = rank.f_clamp_min(0.0)?;
 
     // ---- map rank -> original token id through the sort permutation ----
     let onehot_rank = positions
-        .unsqueeze(0)?
-        .broadcast_as((b, v))?
-        .broadcast_eq(&rank.unsqueeze(1)?.to_dtype(probs.dtype())?)?
-        .to_dtype(probs.dtype())?;
+        .unsqueeze(0)
+        .expand([b, v], false)
+        .f_eq_tensor(&rank.unsqueeze(1))?
+        .to_kind(Kind::Float);
     // idx values are token ids < 2^24 -> exact in f32
     let picked = idx
-        .to_dtype(probs.dtype())?
-        .broadcast_mul(&onehot_rank)?
-        .sum(last)?;
-    picked.to_dtype(DType::U32)
+        .to_kind(Kind::Float)
+        .multiply(&onehot_rank)
+        .f_sum_dim_intlist(vec![dim], false, None)?;
+    Ok(picked.to_kind(Kind::Int))
 }
 
+/// One-hot equality flag per row: `[B, V]` with 1 at the given rank.
+fn _kept_used_docs() {}
+
 /// Position-mask prefix count when the kept set is "the first k ranks".
-fn k_counts_from_positions(positions: &Tensor, k: u32, (b, v): (usize, usize)) -> Result<Tensor> {
-    let mask = positions
-        .unsqueeze(0)?
-        .broadcast_as((b, v))?
-        .to_dtype(DType::F32)?
-        .broadcast_lt(&Tensor::from_vec(vec![k as f32], (), positions.device())?)?;
-    mask.to_dtype(DType::F32)?.sum(1)
+#[allow(dead_code)]
+fn k_counts_from_positions(positions: &Tensor, k: u32, b: i64, v: i64) -> Result<Tensor> {
+    positions
+        .unsqueeze(0)
+        .expand([b, v], false)
+        .f_lt(k as f64)?
+        .f_sum_dim_intlist(vec![1], false, None)
 }
 
 /// Cumulative softmax mass of the tokens *strictly greater* than each given id
@@ -218,30 +218,35 @@ fn k_counts_from_positions(positions: &Tensor, k: u32, (b, v): (usize, usize)) -
 ///
 /// Rank-2 `[B, V]` logits that are already temperature-scaled; `ids` is `[B]`.
 pub fn strictly_greater_mass(logits: &Tensor, ids: &Tensor) -> Result<Tensor> {
-    let dims = logits.dims().to_vec();
+    let ids_cpu = ids.to_device(Device::Cpu).to_kind(Kind::Int);
+    let ids_v: Vec<i32> = (&ids_cpu).try_into().map_err(tch_err)?;
+    let dims = logits.size();
     debug_assert_eq!(dims.len(), 2, "expected [B, V] logits");
     let b = dims[0];
     let v = dims[1];
     let p = softmax(logits)?;
-    let row = logits.unsqueeze(1)?; // [B, 1, V] = logit_i
-    let col = logits.unsqueeze(2)?; // [B, V, 1] = logit_j
-                                    // gt[b,j,i] = logit_i > logit_j: "how much mass sits above token j".
-                                    // The comparison direction is load-bearing — pointing it the other way
-                                    // keeps the TAIL tokens instead of the head.
-    let gt = row.broadcast_gt(&col)?.to_dtype(logits.dtype())?;
-    let mass = gt.broadcast_mul(&p.unsqueeze(1)?)?.sum(2)?.flatten_all()?; // [B, V]
-    let mass_cpu = mass
-        .to_device(&Device::Cpu)?
-        .to_dtype(DType::F32)?
-        .to_vec1::<f32>()?;
-    let ids_cpu = ids
-        .to_device(&Device::Cpu)?
-        .to_dtype(DType::U32)?
-        .to_vec1::<u32>()?;
-    let out: Vec<f32> = (0..b)
-        .map(|r| mass_cpu[r * v + ids_cpu[r] as usize])
+    let row = logits.unsqueeze(1); // [B, 1, V] = logit_i
+    let col = logits.unsqueeze(2); // [B, V, 1] = logit_j
+                                   // gt[b,j,i] = logit_i > logit_j: "how much mass sits above token j".
+                                   // The comparison direction is load-bearing — pointing it the other way
+                                   // keeps the TAIL tokens instead of the head.
+    let gt = row.f_gt_tensor(&col)?.to_kind(logits.kind());
+    let p_exp = p.unsqueeze(1);
+    let mass = gt
+        .multiply(&p_exp)
+        .f_sum_dim_intlist(vec![2_i64], false, None)?
+        .reshape([-1]); // [B, V]
+    let mass_cpu = mass.to_kind(Kind::Float).to_device(Device::Cpu);
+    let mass_v: Vec<f32> = (&mass_cpu).try_into().map_err(tch_err)?;
+    let out: Vec<f32> = (0..b as usize)
+        .map(|r| mass_v[r * v as usize + ids_v[r] as usize])
         .collect();
-    Tensor::from_vec(out, (b,), &Device::Cpu)
+    Ok(Tensor::from_slice(&out))
+}
+
+/// Adapter for the `TryFrom<&Tensor>` conversion error into `TchError`.
+fn tch_err(e: tch::TchError) -> tch::TchError {
+    e
 }
 
 #[cfg(test)]
@@ -251,8 +256,7 @@ mod tests {
     #[test]
     fn deterministic_topk1_is_argmax() {
         let dev = Device::Cpu;
-        let logits =
-            Tensor::from_vec(vec![1.0f32, 9.0, 2.0, -1.0, -5.0, 3.0], (2, 3), &dev).unwrap();
+        let logits = Tensor::from_slice(&[1.0f32, 9.0, 2.0, -1.0, -5.0, 3.0]).reshape([2, 3]);
         let cfg = SampleCfg {
             temperature: 1.0,
             top_k: 1,
@@ -260,60 +264,54 @@ mod tests {
         };
         let tiny = Rng::new(0).uniform_table(1, 2, &dev).unwrap();
         let ids = sample(&logits, &cfg, &tiny).unwrap();
-        assert_eq!(ids.to_vec1::<u32>().unwrap(), vec![1u32, 2]);
+        let v: Vec<i32> = (&ids).try_into().unwrap();
+        assert_eq!(v, vec![1i32, 2]);
     }
 
     #[test]
     fn inverse_cdf_picks_the_expected_token() {
         // logits [0,-1,-2] on T=1: p = [.66524094, .24472848, .09003057];
         // cdf rising = [.6652, .9099, 1.0]. u = 0.8 -> rank 1 = token 1.
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
-        let draws = Tensor::from_vec(vec![0.8f32], (1,), &dev).unwrap();
+        let _dev = Device::Cpu;
+        let logits = Tensor::from_slice(&[0.0f32, -1.0, -2.0]).reshape([1, 3]);
+        let draws = Tensor::from_slice(&[0.8f32]);
         let cfg = SampleCfg {
             temperature: 1.0,
             top_k: 0,
             top_p: 1.0,
         };
-        let id = sample(&logits, &cfg, &draws)
-            .unwrap()
-            .to_vec1::<u32>()
-            .unwrap();
-        assert_eq!(id[0], 1, "u=0.8 must land in token 1's cumulative cell");
-        let draws = Tensor::from_vec(vec![0.99f32], (1,), &dev).unwrap();
-        let id = sample(&logits, &cfg, &draws)
-            .unwrap()
-            .to_vec1::<u32>()
-            .unwrap();
-        assert_eq!(id[0], 2, "u=0.99 must land in token 2's cell");
+        let id = sample(&logits, &cfg, &draws).unwrap();
+        let v: Vec<i32> = (&id).try_into().unwrap();
+        assert_eq!(v[0], 1, "u=0.8 must land in token 1's cumulative cell");
+        let draws = Tensor::from_slice(&[0.99f32]);
+        let id = sample(&logits, &cfg, &draws).unwrap();
+        let v: Vec<i32> = (&id).try_into().unwrap();
+        assert_eq!(v[0], 2, "u=0.99 must land in token 2's cell");
     }
 
     #[test]
     fn nucleus_excludes_the_tail() {
         // p = [.6652, .2447, .0900]; cdf_excl = [0, .6652, .9099].
         // top_p = 0.7: ranks 0,1 kept (0 and .6652 <= .7); rank 2 excluded.
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let _dev = Device::Cpu;
+        let logits = Tensor::from_slice(&[0.0f32, -1.0, -2.0]).reshape([1, 3]);
         let cfg = SampleCfg {
             temperature: 1.0,
             top_k: 0,
             top_p: 0.7,
         };
-        let _draws = Rng::new(1).uniform_table(64, 1, &dev).unwrap();
-        for u in 0..64u64 {
-            let draw = Tensor::from_vec(vec![(u as f64 + 0.5) / 64.0], (1,), &dev).unwrap();
-            let id = sample(&logits, &cfg, &draw)
-                .unwrap()
-                .to_vec1::<u32>()
-                .unwrap();
-            assert_ne!(id[0], 2, "token 2 sits outside a top_p=0.7 nucleus");
+        for i in 0..64u64 {
+            let draw = Tensor::from_slice(&[((i as f64 + 0.5) / 64.0) as f32]);
+            let id = sample(&logits, &cfg, &draw).unwrap();
+            let v: Vec<i32> = (&id).try_into().unwrap();
+            assert_ne!(v[0], 2, "token 2 sits outside a top_p=0.7 nucleus");
         }
     }
 
     #[test]
     fn nucleus_never_drops_the_head() {
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let _dev = Device::Cpu;
+        let logits = Tensor::from_slice(&[0.0f32, -1.0, -2.0]).reshape([1, 3]);
         let cfg = SampleCfg {
             temperature: 1.0,
             top_k: 0,
@@ -321,32 +319,28 @@ mod tests {
         };
         // u=0.0 + eps must still land on rank 0 (the only token under any
         // strict-first-kept-cdf reading)
-        let draw = Tensor::from_vec(vec![0.001f32], (1,), &dev).unwrap();
-        let id = sample(&logits, &cfg, &draw)
-            .unwrap()
-            .to_vec1::<u32>()
-            .unwrap();
-        assert_eq!(id[0], 0);
+        let draw = Tensor::from_slice(&[0.001f32]);
+        let id = sample(&logits, &cfg, &draw).unwrap();
+        let v: Vec<i32> = (&id).try_into().unwrap();
+        assert_eq!(v[0], 0);
     }
 
     #[test]
     fn topk2_removes_the_smallest_only() {
         // logits [3,2,1], top_k=2 -> kept set {3.0, 2.0}; token 2 must NEVER
         // appear over a sweep of all uniforms.
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![3.0f32, 2.0, 1.0], (1, 3), &dev).unwrap();
+        let _dev = Device::Cpu;
+        let logits = Tensor::from_slice(&[3.0f32, 2.0, 1.0]).reshape([1, 3]);
         let cfg = SampleCfg {
             temperature: 1.0,
             top_k: 2,
             top_p: 1.0,
         };
         for i in 0..64u64 {
-            let draw = Tensor::from_vec(vec![(i as f64 + 0.5) / 64.0], (1,), &dev).unwrap();
-            let id = sample(&logits, &cfg, &draw)
-                .unwrap()
-                .to_vec1::<u32>()
-                .unwrap();
-            assert!(id[0] == 0 || id[0] == 1, "draw {i}: got token {}", id[0]);
+            let draw = Tensor::from_slice(&[((i as f64 + 0.5) / 64.0) as f32]);
+            let id = sample(&logits, &cfg, &draw).unwrap();
+            let v: Vec<i32> = (&id).try_into().unwrap();
+            assert!(v[0] == 0 || v[0] == 1, "draw {i}: got token {}", v[0]);
         }
     }
 
@@ -354,20 +348,18 @@ mod tests {
     fn filtered_renormalisation_covers_the_kept_set() {
         // top_p just under the cumulative boundary: kept = {0,1}; draws must
         // still cover BOTH kept tokens all the way to u -> 1 - eps.
-        let dev = Device::Cpu;
-        let logits = Tensor::from_vec(vec![0.0f32, -1.0, -2.0], (1, 3), &dev).unwrap();
+        let _dev = Device::Cpu;
+        let logits = Tensor::from_slice(&[0.0f32, -1.0, -2.0]).reshape([1, 3]);
         let cfg = SampleCfg {
             temperature: 1.0,
             top_k: 0,
             top_p: 0.7,
         };
-        let draw = Tensor::from_vec(vec![0.999f32], (1,), &dev).unwrap();
-        let id = sample(&logits, &cfg, &draw)
-            .unwrap()
-            .to_vec1::<u32>()
-            .unwrap();
+        let draw = Tensor::from_slice(&[0.999f32]);
+        let id = sample(&logits, &cfg, &draw).unwrap();
+        let v: Vec<i32> = (&id).try_into().unwrap();
         assert_eq!(
-            id[0], 1,
+            v[0], 1,
             "renormalised tail of the kept set must be reachable"
         );
     }
@@ -377,16 +369,12 @@ mod tests {
         let dev = Device::Cpu;
         let a = Rng::new(123).uniform_table(3, 4, &dev).unwrap();
         let b = Rng::new(123).uniform_table(3, 4, &dev).unwrap();
-        assert_eq!(a.dims(), &[3, 4]);
-        assert_eq!(a.to_vec2::<f32>().unwrap(), b.to_vec2::<f32>().unwrap());
-        // row-major step-major order matches the loop's consumption order
-        let first_step = a
-            .narrow(0, 0, 1)
-            .unwrap()
-            .flatten_all()
-            .unwrap()
-            .to_vec1::<f32>()
-            .unwrap();
-        assert!(first_step.iter().all(|x| (0.0..1.0).contains(x)));
+        assert_eq!(a.size(), [3, 4]);
+        let ac = a.reshape([-1]).to_device(Device::Cpu);
+        let bc = b.reshape([-1]).to_device(Device::Cpu);
+        let av: Vec<f32> = (&ac).try_into().unwrap();
+        let bv: Vec<f32> = (&bc).try_into().unwrap();
+        assert_eq!(av, bv);
+        assert!(av.iter().all(|x| (0.0..1.0).contains(x)));
     }
 }

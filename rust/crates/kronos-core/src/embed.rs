@@ -1,9 +1,10 @@
 //! Embeddings and output heads — `model/module.py:400-443`, `:486-513`, `:536-562`.
 
 use crate::config::PredictorConfig;
+use crate::ops::Result;
 use crate::ops::{embedding_lookup, linear};
 use crate::weights::Weights;
-use candle_core::{DType, Result, Tensor};
+use tch::{Kind, Tensor};
 
 /// `HierarchicalEmbedding` — `model/module.py:400-443`.
 ///
@@ -22,10 +23,10 @@ pub struct HierarchicalEmbedding {
 impl HierarchicalEmbedding {
     pub fn load(w: &Weights, cfg: &PredictorConfig) -> Result<Self> {
         Ok(Self {
-            emb_s1: w.get("embedding.emb_s1.weight").clone(),
-            emb_s2: w.get("embedding.emb_s2.weight").clone(),
-            fusion_w: w.get("embedding.fusion_proj.weight").clone(),
-            fusion_b: w.get("embedding.fusion_proj.bias").clone(),
+            emb_s1: w.get("embedding.emb_s1.weight").shallow_clone(),
+            emb_s2: w.get("embedding.emb_s2.weight").shallow_clone(),
+            fusion_w: w.get("embedding.fusion_proj.weight").shallow_clone(),
+            fusion_b: w.get("embedding.fusion_proj.bias").shallow_clone(),
             scale: (cfg.d_model as f64).sqrt(),
         })
     }
@@ -35,9 +36,9 @@ impl HierarchicalEmbedding {
     }
 
     pub fn forward(&self, s1_ids: &Tensor, s2_ids: &Tensor) -> Result<Tensor> {
-        let a = embedding_lookup(&self.emb_s1, s1_ids)?.affine(self.scale, 0.0)?;
-        let b = embedding_lookup(&self.emb_s2, s2_ids)?.affine(self.scale, 0.0)?;
-        let cat = Tensor::cat(&[&a, &b], a.dims().len() - 1)?;
+        let a = embedding_lookup(&self.emb_s1, s1_ids)? * self.scale;
+        let b = embedding_lookup(&self.emb_s2, s2_ids)? * self.scale;
+        let cat = Tensor::cat(&[&a, &b], a.size().len() as i64 - 1);
         linear(&cat, &self.fusion_w, Some(&self.fusion_b))
     }
 }
@@ -67,41 +68,28 @@ impl TemporalEmbedding {
              port does not implement; all released checkpoints use learn_te=true"
         );
         Ok(Self {
-            minute: w.get("time_emb.minute_embed.weight").clone(),
-            hour: w.get("time_emb.hour_embed.weight").clone(),
-            weekday: w.get("time_emb.weekday_embed.weight").clone(),
-            day: w.get("time_emb.day_embed.weight").clone(),
-            month: w.get("time_emb.month_embed.weight").clone(),
+            minute: w.get("time_emb.minute_embed.weight").shallow_clone(),
+            hour: w.get("time_emb.hour_embed.weight").shallow_clone(),
+            weekday: w.get("time_emb.weekday_embed.weight").shallow_clone(),
+            day: w.get("time_emb.day_embed.weight").shallow_clone(),
+            month: w.get("time_emb.month_embed.weight").shallow_clone(),
         })
     }
 
     /// `stamp` is `[B, L, 5]` of calendar features; upstream casts to long.
     pub fn forward(&self, stamp: &Tensor) -> Result<Tensor> {
-        let long = stamp.to_dtype(DType::U32)?;
-        let mut acc = embedding_lookup(&self.minute, &long.narrow(2, 0, 1)?.squeeze(2)?)?;
-        acc = acc.broadcast_add(&embedding_lookup(
-            &self.hour,
-            &long.narrow(2, 1, 1)?.squeeze(2)?,
-        )?)?;
-        acc = acc.broadcast_add(&embedding_lookup(
-            &self.weekday,
-            &long.narrow(2, 2, 1)?.squeeze(2)?,
-        )?)?;
-        acc = acc.broadcast_add(&embedding_lookup(
-            &self.day,
-            &long.narrow(2, 3, 1)?.squeeze(2)?,
-        )?)?;
-        acc.broadcast_add(&embedding_lookup(
-            &self.month,
-            &long.narrow(2, 4, 1)?.squeeze(2)?,
-        )?)
+        let long = stamp.to_kind(Kind::Int);
+        let mut acc = embedding_lookup(&self.minute, &long.narrow(2, 0, 1).squeeze_dim(2))?;
+        acc = &acc + &embedding_lookup(&self.hour, &long.narrow(2, 1, 1).squeeze_dim(2))?;
+
+        acc = &acc + &embedding_lookup(&self.weekday, &long.narrow(2, 2, 1).squeeze_dim(2))?;
+
+        acc = &acc + &embedding_lookup(&self.day, &long.narrow(2, 3, 1).squeeze_dim(2))?;
+
+        Ok(&acc + &embedding_lookup(&self.month, &long.narrow(2, 4, 1).squeeze_dim(2))?)
     }
 }
 
-/// `DualHead` — `model/module.py:486-513`.
-///
-/// Two independent Linear layers over vocab sizes `2**s1_bits` and `2**s2_bits`
-/// (1,024 each for every released checkpoint).
 pub struct DualHead {
     proj_s1_w: Tensor,
     proj_s1_b: Tensor,
@@ -112,10 +100,10 @@ pub struct DualHead {
 impl DualHead {
     pub fn load(w: &Weights) -> Result<Self> {
         Ok(Self {
-            proj_s1_w: w.get("head.proj_s1.weight").clone(),
-            proj_s1_b: w.get("head.proj_s1.bias").clone(),
-            proj_s2_w: w.get("head.proj_s2.weight").clone(),
-            proj_s2_b: w.get("head.proj_s2.bias").clone(),
+            proj_s1_w: w.get("head.proj_s1.weight").shallow_clone(),
+            proj_s1_b: w.get("head.proj_s1.bias").shallow_clone(),
+            proj_s2_w: w.get("head.proj_s2.weight").shallow_clone(),
+            proj_s2_b: w.get("head.proj_s2.bias").shallow_clone(),
         })
     }
 

@@ -6,12 +6,13 @@
 
 use crate::block::TransformerBlock;
 use crate::config::{BlockGeometry, TokenizerConfig};
+use crate::ops::Result;
 use crate::ops::{
     bits_to_indices, bsq_sign, build_group_codebook, indices_to_bits, l2_normalize, RotaryCache,
 };
 use crate::weights::Weights;
-use candle_core::{DType, Result, Tensor};
 use std::collections::BTreeMap;
+use tch::{Device, Kind, Tensor};
 
 /// A pair of subtoken id tensors `[B, T]`, one for each half of the binary code.
 pub type SubTokens = (Tensor, Tensor);
@@ -38,7 +39,7 @@ pub struct KronosTokenizer {
     /// Rebuilt at runtime: `group_codebook` is registered `persistent=False`
     /// (module.py:78) so it exists in no checkpoint.
     group_codebook: Tensor,
-    dtype: DType,
+    dtype: Kind,
 }
 
 impl KronosTokenizer {
@@ -46,8 +47,8 @@ impl KronosTokenizer {
         w: &Weights,
         cfg: &TokenizerConfig,
         max_len: usize,
-        dev: &candle_core::Device,
-        dtype: DType,
+        dev: &Device,
+        dtype: Kind,
     ) -> Result<Self> {
         // Note the tokenizer's OWN geometry (256/4/512) — not the predictor's.
         // Using the predictor's head count here would silently reshape attention
@@ -73,16 +74,16 @@ impl KronosTokenizer {
             )?);
         }
         Ok(Self {
-            embed_w: w.get("embed.weight").clone(),
-            embed_b: w.get("embed.bias").clone(),
+            embed_w: w.get("embed.weight").shallow_clone(),
+            embed_b: w.get("embed.bias").shallow_clone(),
             encoder,
-            quant_embed_w: w.get("quant_embed.weight").clone(),
-            quant_embed_b: w.get("quant_embed.bias").clone(),
-            post_quant_w: w.get("post_quant_embed.weight").clone(),
-            post_quant_b: w.get("post_quant_embed.bias").clone(),
+            quant_embed_w: w.get("quant_embed.weight").shallow_clone(),
+            quant_embed_b: w.get("quant_embed.bias").shallow_clone(),
+            post_quant_w: w.get("post_quant_embed.weight").shallow_clone(),
+            post_quant_b: w.get("post_quant_embed.bias").shallow_clone(),
             decoder,
-            head_w: w.get("head.weight").clone(),
-            head_b: w.get("head.bias").clone(),
+            head_w: w.get("head.weight").shallow_clone(),
+            head_b: w.get("head.bias").shallow_clone(),
             group_codebook: build_group_codebook(cfg.group_size, dev)?,
             dtype,
             cfg: cfg.clone(),
@@ -97,17 +98,17 @@ impl KronosTokenizer {
     pub fn encode_with_stages(&self, x: &Tensor) -> Result<BTreeMap<String, Tensor>> {
         let mut stages = BTreeMap::new();
         let mut z = crate::ops::linear(x, &self.embed_w, Some(&self.embed_b))?;
-        stages.insert("tok.embed".to_string(), z.to_dtype(DType::F64)?);
+        stages.insert("tok.embed".to_string(), z.to_kind(Kind::Double));
         for (i, blk) in self.encoder.iter().enumerate() {
             z = blk.forward(&z)?;
-            stages.insert(format!("tok.encoder.{i}"), z.to_dtype(DType::F64)?);
+            stages.insert(format!("tok.encoder.{i}"), z.to_kind(Kind::Double));
         }
         let z = crate::ops::linear(&z, &self.quant_embed_w, Some(&self.quant_embed_b))?;
-        stages.insert("tok.quant_embed".to_string(), z.to_dtype(DType::F64)?);
+        stages.insert("tok.quant_embed".to_string(), z.to_kind(Kind::Double));
         let quantized = self.bsq(&z)?;
         stages.insert(
             "tok.tokenizer.bsq".to_string(),
-            quantized.to_dtype(DType::F64)?,
+            quantized.to_kind(Kind::Double),
         );
         Ok(stages)
     }
@@ -136,7 +137,7 @@ impl KronosTokenizer {
     fn bsq(&self, z: &Tensor) -> Result<Tensor> {
         let normalized = l2_normalize(z)?;
         let signed = bsq_sign(&normalized)?;
-        signed.affine(self.cfg.q_scale() as f64, 0.0)
+        Ok(signed * self.cfg.q_scale() as f64)
     }
 
     /// Split the 20-bit code into its two 10-bit subtokens — `module.py:248-252`.
@@ -144,26 +145,26 @@ impl KronosTokenizer {
     /// `half=True` takes `quantized[..., :s1_bits]` and `quantized[..., s1_bits:]`,
     /// which is a slice on the **last** axis of a `[B, T, 20]` tensor.
     fn split_half(&self, quantized: &Tensor) -> Result<SubTokens> {
-        let last = quantized.dims().len() - 1;
-        let s1 = bits_to_indices(&quantized.narrow(last, 0, self.cfg.s1_bits as usize)?)?;
+        let last = quantized.size().len() as i64 - 1;
+        let s1 = bits_to_indices(&quantized.narrow(last, 0, self.cfg.s1_bits as i64))?;
         let s2 = bits_to_indices(&quantized.narrow(
             last,
-            self.cfg.s1_bits as usize,
-            self.cfg.s2_bits as usize,
-        )?)?;
-        Ok((s1.to_dtype(DType::U32)?, s2.to_dtype(DType::U32)?))
+            self.cfg.s1_bits as i64,
+            self.cfg.s2_bits as i64,
+        ))?;
+        Ok((s1.to_kind(Kind::Int), s2.to_kind(Kind::Int)))
     }
 
     /// `KronosTokenizer.decode` — `model/kronos.py:161-177`, `half=True`.
     pub fn decode(&self, tokens: &SubTokens) -> Result<Tensor> {
         let bits = indices_to_bits(
-            &tokens.0.to_dtype(DType::F64)?,
-            &tokens.1.to_dtype(DType::F64)?,
+            &tokens.0.to_kind(Kind::Double),
+            &tokens.1.to_kind(Kind::Double),
             self.cfg.codebook_dim(),
             self.cfg.q_scale() as f64,
         )?;
         let mut z = crate::ops::linear(
-            &bits.to_dtype(self.dtype)?,
+            &bits.to_kind(self.dtype),
             &self.post_quant_w,
             Some(&self.post_quant_b),
         )?;
@@ -174,7 +175,7 @@ impl KronosTokenizer {
     }
 
     /// The compute dtype the weights were loaded in.
-    pub fn dtype(&self) -> DType {
+    pub fn dtype(&self) -> Kind {
         self.dtype
     }
 

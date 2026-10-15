@@ -13,12 +13,12 @@
 //! cargo test -p kronos-core --test weight_loading
 //! ```
 
-use candle_core::{DType, Device};
 use kronos_core::{
     expected_predictor_keys, expected_tokenizer_keys, load_predictor_weights,
     load_tokenizer_weights, PredictorConfig, TokenizerConfig,
 };
 use std::path::{Path, PathBuf};
+use tch::{Device, Kind as DType};
 
 fn hf_cache() -> PathBuf {
     std::env::var("KRONOS_HF_CACHE")
@@ -64,7 +64,11 @@ const TOKENIZERS: &[(&str, &str)] = &[
 #[test]
 fn every_released_predictor_loads_completely() {
     let cache = hf_cache();
-    let dev = Device::new_cuda(0).unwrap_or(Device::Cpu);
+    let dev = if tch::utils::has_cuda() {
+        Device::Cuda(0)
+    } else {
+        Device::Cpu
+    };
     let mut ran = 0;
     for (repo, want_params) in PREDICTORS {
         let w = ckpt(&cache, repo);
@@ -80,7 +84,7 @@ fn every_released_predictor_loads_completely() {
         cfg.validate().expect("config valid");
 
         let expected = expected_predictor_keys(&cfg);
-        let loaded = load_predictor_weights(&w, &cfg, DType::F32, &dev).expect("weights load");
+        let loaded = load_predictor_weights(&w, &cfg, DType::Float, &dev).expect("weights load");
 
         assert_eq!(loaded.len(), expected.len(), "{repo}: tensor count");
         assert_eq!(
@@ -104,7 +108,11 @@ fn every_released_predictor_loads_completely() {
 #[test]
 fn every_released_tokenizer_loads_completely() {
     let cache = hf_cache();
-    let dev = Device::new_cuda(0).unwrap_or(Device::Cpu);
+    let dev = if tch::utils::has_cuda() {
+        Device::Cuda(0)
+    } else {
+        Device::Cpu
+    };
     let mut ran = 0;
     for (repo, _) in TOKENIZERS {
         let Some(w) = ckpt(&cache, repo) else {
@@ -117,7 +125,7 @@ fn every_released_tokenizer_loads_completely() {
         let cfg = TokenizerConfig::from_json(&cfg_of(&w)).expect("config parses");
         cfg.validate().expect("config valid");
         let expected = expected_tokenizer_keys(&cfg);
-        let loaded = load_tokenizer_weights(&w, &cfg, DType::F32, &dev).expect("weights load");
+        let loaded = load_tokenizer_weights(&w, &cfg, DType::Float, &dev).expect("weights load");
         // The two i64 BSQ basis buffers are validated by name/dtype/shape but
         // deliberately absent from the device map (no i64 CUDA path, unused at
         // inference); the rest must all be present.
@@ -188,8 +196,8 @@ fn truncated_checkpoint_is_rejected() {
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("model.safetensors");
 
-    let t = candle_core::Tensor::zeros((4, 4), DType::F32, &Device::Cpu).unwrap();
-    t.save_safetensors("only_this", &path).unwrap();
+    let t = tch::Tensor::zeros([4, 4], (DType::Float, Device::Cpu));
+    tch::Tensor::write_safetensors(&[("only_this", &t)], &path).unwrap();
 
     let mut expected = std::collections::BTreeSet::new();
     expected.insert("only_this".to_string());

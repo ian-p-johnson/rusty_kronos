@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 kronos-core = { path = "../kronos-core" }
-candle-core.workspace = true
+tch.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

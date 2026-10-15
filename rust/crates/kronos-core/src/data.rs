@@ -9,7 +9,8 @@
 //! Deliberately dependency-free: the file is machine-written with a fixed
 //! schema, so a hand-rolled parser is cheap and keeps the port standalone.
 
-use candle_core::{Device, Tensor};
+use std::result::Result;
+use tch::{Device, Tensor};
 
 /// One OHLCVA row with its wall-clock timestamp.
 #[derive(Debug, Clone, Copy)]
@@ -148,7 +149,7 @@ pub fn stamp_tensor(
     hs: &[i32],
     mins: &[i32],
     dev: &Device,
-) -> candle_core::Result<Tensor> {
+) -> tch::Result<Tensor> {
     let n = ys.len();
     let v: Vec<f32> = (0..n)
         .flat_map(|i| {
@@ -161,11 +162,13 @@ pub fn stamp_tensor(
             ]
         })
         .collect();
-    Tensor::from_vec(v, (n, 5), dev)
+    Ok(Tensor::from_slice(&v)
+        .reshape([n as i64, 5])
+        .to_device(*dev))
 }
 
 /// Convenience: stamps for a slice of K-lines (a contiguous view of the file).
-pub fn stamps(rows: &[Kline], dev: &Device) -> candle_core::Result<Tensor> {
+pub fn stamps(rows: &[Kline], dev: &Device) -> tch::Result<Tensor> {
     stamp_tensor(
         &rows.iter().map(|r| r.y).collect::<Vec<_>>(),
         &rows.iter().map(|r| r.mo).collect::<Vec<_>>(),
@@ -177,13 +180,15 @@ pub fn stamps(rows: &[Kline], dev: &Device) -> candle_core::Result<Tensor> {
 }
 
 /// `[cols]` values for a contiguous slice, as an F32 tensor.
-pub fn values(rows: &[Kline], dev: &Device) -> candle_core::Result<Tensor> {
+pub fn values(rows: &[Kline], dev: &Device) -> tch::Result<Tensor> {
     let n = rows.len();
     let mut v = Vec::with_capacity(n * 6);
     for r in rows {
         v.extend_from_slice(&r.v);
     }
-    Tensor::from_vec(v, (n, 6), dev)?.contiguous()
+    Ok(Tensor::from_slice(&v)
+        .reshape([n as i64, 6])
+        .to_device(*dev))
 }
 
 #[cfg(test)]

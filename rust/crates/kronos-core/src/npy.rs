@@ -7,11 +7,12 @@
 //! Layout: magic `\x93NUMPY` | major u8 | minor u8 | header_len u16 (v1) or
 //! u32 (v2) | python dict header | raw C-order data.
 
-use candle_core::{DType, Device, Result, Tensor};
+use crate::ops::Result;
 use std::path::Path;
+use tch::{Kind, Tensor};
 
-fn err(msg: impl std::fmt::Display) -> candle_core::Error {
-    candle_core::Error::Msg(msg.to_string())
+fn err(msg: impl std::fmt::Display) -> tch::TchError {
+    tch::TchError::Convert(format!("{msg}"))
 }
 
 /// Extract `'shape': (1, 2, 3)` from the header dict.
@@ -46,19 +47,17 @@ fn fortran_order(header: &str) -> bool {
     header.contains("'fortran_order': True") || header.contains("'fortran_order': true")
 }
 
-fn dtype_of(header: &str) -> DType {
+fn dtype_of(header: &str) -> Kind {
     if header.contains("'<f4'") || header.contains("\"<f4\"") {
-        DType::F32
+        Kind::Float
     } else if header.contains("'<f8'") || header.contains("\"<f8\"") {
-        DType::F64
+        Kind::Double
     } else if header.contains("'<i8'") || header.contains("\"<i8\"") {
-        DType::I64
+        Kind::Int64
     } else if header.contains("'|u1'") {
-        DType::U8
-    } else if header.contains("'<u4'") {
-        DType::U32
+        Kind::Uint8
     } else {
-        DType::F32
+        Kind::Float
     }
 }
 
@@ -86,9 +85,9 @@ pub fn read_npy(path: &Path) -> Result<Tensor> {
     // a (1,1) array as if it had 2 elements and rejected a valid file.
     let n: usize = shape.iter().product::<usize>();
     let elem = match dt {
-        DType::F32 | DType::U32 => 4,
-        DType::F64 | DType::I64 => 8,
-        DType::U8 => 1,
+        Kind::Float => 4,
+        Kind::Double | Kind::Int64 => 8,
+        Kind::Uint8 => 1,
         other => return Err(err(format!("unsupported npy dtype {other:?}"))),
     };
     if data.len() < n * elem {
@@ -117,23 +116,26 @@ pub fn read_npy(path: &Path) -> Result<Tensor> {
         shape.clone()
     };
     match dt {
-        DType::F32 => {
+        Kind::Float => {
             let v: Vec<f32> = data[..n * 4]
                 .as_chunks::<4>()
                 .0
                 .iter()
                 .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                 .collect();
-            let t = Tensor::from_vec(v, to_shape, &Device::Cpu)?;
+            let t = Tensor::from_slice(&v)
+                .reshape(to_shape.iter().map(|&d| d as i64).collect::<Vec<_>>());
             if fortran {
                 // written column-major: present it row-major
-                let perm: Vec<usize> = (0..shape.len()).rev().collect();
-                t.permute(perm.as_slice())?.contiguous()
+                let perm: Vec<i64> = (0..shape.len())
+                    .map(|i| (shape.len() - 1 - i) as i64)
+                    .collect();
+                Ok(t.f_permute(perm.as_slice())?.contiguous())
             } else {
                 Ok(t)
             }
         }
-        DType::I64 => {
+        Kind::Int64 => {
             // '<i8' is 8 bytes per element; earlier code read 4 and widened the
             // low half, which doubled every index past 2^31 and silently
             // shifted the attribute axis.
@@ -144,10 +146,13 @@ pub fn read_npy(path: &Path) -> Result<Tensor> {
                 .iter()
                 .map(|c| i64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
                 .collect();
-            let t = Tensor::from_vec(v, to_shape, &Device::Cpu)?;
+            let t = Tensor::from_slice(&v)
+                .reshape(to_shape.iter().map(|&d| d as i64).collect::<Vec<_>>());
             if fortran {
-                let perm: Vec<usize> = (0..shape.len()).rev().collect();
-                t.permute(perm.as_slice())?.contiguous()
+                let perm: Vec<i64> = (0..shape.len())
+                    .map(|i| (shape.len() - 1 - i) as i64)
+                    .collect();
+                Ok(t.f_permute(perm.as_slice())?.contiguous())
             } else {
                 Ok(t)
             }
@@ -195,8 +200,8 @@ mod tests {
         let p = std::env::temp_dir().join("kronos_npy_test.npy");
         write_npy(&p, &[2, 3], &[1.0, -2.0, 3.0, 4.0, -5.0, 6.0]);
         let t = read_npy(&p).unwrap();
-        assert_eq!(t.dims(), &[2, 3]);
-        let v: Vec<Vec<f32>> = t.to_vec2().unwrap();
+        assert_eq!(t.size(), [2, 3]);
+        let v: Vec<Vec<f32>> = (&t).try_into().unwrap();
         assert_eq!(v[0], vec![1.0, -2.0, 3.0]);
         assert_eq!(v[1], vec![4.0, -5.0, 6.0]);
         let _ = std::fs::remove_file(&p);
